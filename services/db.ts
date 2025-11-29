@@ -15,17 +15,10 @@ class MockDB {
 
   // --- INIT ---
   init() {
-    const users = this.get<User>('users');
-    if (!users.find(u => u.role === Role.Teacher)) {
-      users.push({
-        id: 'teacher-1',
-        name: 'Professor Principal',
-        username: 'prof',
-        password: '123', // In a real app, use bcrypt. Here simple string match for demo.
-        role: Role.Teacher,
-        blocked: false
-      });
-      this.set('users', users);
+    const setupDone = localStorage.getItem('setupDone');
+    if (!setupDone) {
+      this.resetUsersAndQuizzes('profdiogo', 'poli0402');
+      localStorage.setItem('setupDone', 'true');
     }
   }
 
@@ -51,6 +44,22 @@ class MockDB {
     let users = this.get<User>('users');
     users = users.filter(u => u.id !== id);
     this.set('users', users);
+  }
+
+  resetUsersAndQuizzes(username: string, password: string) {
+    const newUsers: User[] = [
+      {
+        id: 'teacher-1',
+        name: 'Administrador',
+        username,
+        password,
+        role: Role.Teacher,
+        blocked: false
+      }
+    ];
+    this.set('users', newUsers);
+    this.set('quizzes', []);
+    this.set('questions', []);
   }
 
   // --- QUIZZES ---

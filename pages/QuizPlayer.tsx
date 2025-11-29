@@ -16,6 +16,10 @@ export const QuizPlayer = () => {
   const [stepFeedback, setStepFeedback] = React.useState<{isCorrect: boolean, show: boolean}>({ isCorrect: false, show: false });
   const [submitted, setSubmitted] = React.useState(false);
   const [score, setScore] = React.useState(0);
+  const goToIndex = (i: number) => {
+    setStepFeedback({ show: false, isCorrect: false });
+    setCurrentIdx(i);
+  };
 
   React.useEffect(() => {
     if (id) {
@@ -148,9 +152,26 @@ export const QuizPlayer = () => {
             </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="w-full bg-slate-200 h-1.5 rounded-full mb-6">
+        <div className="w-full bg-slate-200 h-1.5 rounded-full mb-3">
             <div className="bg-indigo-600 h-1.5 rounded-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
+        </div>
+        <div className="mb-6 grid grid-cols-8 sm:grid-cols-12 gap-2">
+            {questions.map((q, idx) => {
+                const answered = !!answers[q.id];
+                const isCurrent = idx === currentIdx;
+                return (
+                  <button
+                    key={q.id}
+                    onClick={() => goToIndex(idx)}
+                    className={cn(
+                      "h-8 rounded text-xs font-medium border",
+                      isCurrent ? "bg-indigo-600 text-white border-indigo-600" : answered ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-white text-slate-600 border-slate-200"
+                    )}
+                  >
+                    {idx + 1}
+                  </button>
+                );
+            })}
         </div>
 
         {/* Question Card */}
