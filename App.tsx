@@ -10,6 +10,7 @@ import { Layout } from './components/Layout';
 import { db } from './services/db';
 import { User, Role, SUBJECT_LABELS } from './types';
 import { Button, Card } from './components/ui';
+import { CloudSync } from './services/sync';
 
 // Mock list page for students
 const StudentQuizzes: React.FC<{ user: User }> = ({ user }) => {
@@ -50,6 +51,7 @@ const StudentQuizzes: React.FC<{ user: User }> = ({ user }) => {
 const AdminUsers = () => {
     const [users, setUsers] = React.useState(db.getUsers());
     const [file, setFile] = React.useState<File | null>(null);
+    const [syncEnabled, setSyncEnabled] = React.useState(CloudSync.enabled);
     const deleteUser = (id: string) => {
         if(confirm('Remover usuário?')) {
             db.deleteUser(id);
@@ -80,6 +82,16 @@ const AdminUsers = () => {
         alert('Dados mesclados. Usuários e listas sincronizados.');
     };
 
+    const syncDown = async () => {
+        await db.syncDown();
+        setUsers(db.getUsers());
+        alert('Sincronização: dados baixados da nuvem.');
+    };
+    const syncUp = async () => {
+        await db.syncUp();
+        alert('Sincronização: dados enviados à nuvem.');
+    };
+
     return (
         <div className="space-y-6">
             <h1 className="text-2xl font-bold">Gerenciar Usuários</h1>
@@ -87,6 +99,12 @@ const AdminUsers = () => {
                 <Button onClick={exportDB}>Exportar Dados</Button>
                 <input type="file" accept="application/json" onChange={e => setFile(e.target.files?.[0] || null)} />
                 <Button variant="outline" onClick={importMerge} disabled={!file}>Importar/Mesclar</Button>
+                {syncEnabled && (
+                  <>
+                    <Button onClick={syncDown}>Sync Down</Button>
+                    <Button variant="outline" onClick={syncUp}>Sync Up</Button>
+                  </>
+                )}
             </div>
             <div className="bg-white rounded-lg shadow overflow-hidden">
                 <table className="min-w-full divide-y divide-slate-200">

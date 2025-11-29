@@ -1,4 +1,5 @@
 import { User, Quiz, Question, Result, Attendance, Payment, Role, Subject, Attempt, Appointment } from '../types';
+import { CloudSync } from './sync';
 
 // Helper to generate IDs
 const uid = () => Math.random().toString(36).substr(2, 9);
@@ -28,6 +29,9 @@ class MockDB {
       });
       this.set('users', users);
     }
+    if (CloudSync.enabled) {
+      this.syncDown();
+    }
   }
 
   // --- USERS ---
@@ -39,6 +43,7 @@ class MockDB {
     const newUser = { ...user, id: uid(), grade: user.grade || 'OUTROS' };
     users.push(newUser);
     this.set('users', users);
+    if (CloudSync.enabled) CloudSync.upsert('users', newUser);
     return newUser;
   }
   updateUser(id: string, data: Partial<User>) {
@@ -77,6 +82,7 @@ class MockDB {
     const newQuiz = { ...quiz, id: uid(), createdAt: new Date().toISOString() };
     quizzes.push(newQuiz);
     this.set('quizzes', quizzes);
+    if (CloudSync.enabled) CloudSync.upsert('quizzes', newQuiz);
     return newQuiz;
   }
   deleteQuiz(id: string) {
@@ -107,6 +113,7 @@ class MockDB {
     const newQ = { ...q, id: uid() };
     questions.push(newQ);
     this.set('questions', questions);
+    if (CloudSync.enabled) CloudSync.upsert('questions', newQ);
     return newQ;
   }
   updateQuestion(id: string, data: Partial<Question>) {
@@ -136,6 +143,7 @@ class MockDB {
     const newRes = { ...result, id: uid(), date: new Date().toISOString() };
     results.push(newRes);
     this.set('results', results);
+    if (CloudSync.enabled) CloudSync.upsert('results', newRes);
   }
 
   // --- ATTEMPTS ---
@@ -173,6 +181,7 @@ class MockDB {
     const list = this.get<Attendance>('attendance');
     list.push({ ...att, id: uid() });
     this.set('attendance', list);
+    if (CloudSync.enabled) CloudSync.upsert('attendance', list[list.length-1]);
   }
 
   getPayments(userId: string) { return this.get<Payment>('payments').filter(p => p.userId === userId); }
@@ -180,6 +189,7 @@ class MockDB {
     const list = this.get<Payment>('payments');
     list.push({ ...pay, id: uid() });
     this.set('payments', list);
+    if (CloudSync.enabled) CloudSync.upsert('payments', list[list.length-1]);
   }
   
   // --- APPOINTMENTS ---
@@ -193,7 +203,38 @@ class MockDB {
     const newApp = { ...app, id: uid(), createdAt: new Date().toISOString() };
     list.push(newApp);
     this.set('appointments', list);
+    if (CloudSync.enabled) CloudSync.upsert('appointments', newApp);
     return newApp;
+  }
+
+  async syncDown() {
+    const users = await CloudSync.list('users');
+    if (users.length) this.set('users', users);
+    const quizzes = await CloudSync.list('quizzes');
+    if (quizzes.length) this.set('quizzes', quizzes);
+    const questions = await CloudSync.list('questions');
+    if (questions.length) this.set('questions', questions);
+    const results = await CloudSync.list('results');
+    if (results.length) this.set('results', results);
+    const attempts = await CloudSync.list('attempts');
+    if (attempts.length) this.set('attempts', attempts);
+    const attendance = await CloudSync.list('attendance');
+    if (attendance.length) this.set('attendance', attendance);
+    const payments = await CloudSync.list('payments');
+    if (payments.length) this.set('payments', payments);
+    const appointments = await CloudSync.list('appointments');
+    if (appointments.length) this.set('appointments', appointments);
+  }
+
+  async syncUp() {
+    await CloudSync.bulkUpsert('users', this.get<User>('users'));
+    await CloudSync.bulkUpsert('quizzes', this.get<Quiz>('quizzes'));
+    await CloudSync.bulkUpsert('questions', this.get<Question>('questions'));
+    await CloudSync.bulkUpsert('results', this.get<Result>('results'));
+    await CloudSync.bulkUpsert('attempts', this.get<Attempt>('attempts'));
+    await CloudSync.bulkUpsert('attendance', this.get<Attendance>('attendance'));
+    await CloudSync.bulkUpsert('payments', this.get<Payment>('payments'));
+    await CloudSync.bulkUpsert('appointments', this.get<Appointment>('appointments'));
   }
   
   // Backup/Restore
