@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { db } from '../services/db';
-import { User, Attendance, Payment } from '../types';
+import { User, Attendance, Payment, Result } from '../types';
 import { Card, Button } from '../components/ui';
 
 export const AdminUserDetails = () => {
@@ -9,6 +9,7 @@ export const AdminUserDetails = () => {
   const [user, setUser] = React.useState<User | null>(null);
   const [attendance, setAttendance] = React.useState<Attendance[]>([]);
   const [payments, setPayments] = React.useState<Payment[]>([]);
+  const [results, setResults] = React.useState<Result[]>([]);
   const [attDate, setAttDate] = React.useState('');
   const [attContent, setAttContent] = React.useState('');
   const [payAmount, setPayAmount] = React.useState('');
@@ -22,6 +23,7 @@ export const AdminUserDetails = () => {
     setUser(u);
     setAttendance(db.getAttendance(id));
     setPayments(db.getPayments(id));
+    setResults(db.getResults(id));
   };
 
   React.useEffect(load, [id]);
@@ -40,6 +42,9 @@ export const AdminUserDetails = () => {
     load();
   };
 
+  const delAtt = (attId: string) => { db.deleteAttendance(attId); load(); };
+  const delPay = (payId: string) => { db.deletePayment(payId); load(); };
+
   const exportCSV = (rows: any[], headers: string[], filename: string) => {
     const csv = [headers.join(',')].concat(rows.map(r => headers.map(h => JSON.stringify(r[h] ?? '')).join(','))).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -52,6 +57,17 @@ export const AdminUserDetails = () => {
   if (!user) return <div className="p-6">Usuário não encontrado.</div>;
 
   const totalPayments = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const quizzesById = new Map(db.getQuizzes().map(q => [q.id, q]));
+  const performance = results.map(r => ({
+    quizTitle: quizzesById.get(r.quizId)?.title || r.quizId,
+    score: r.score,
+    total: r.total,
+    errors: (r.total - r.score),
+    durationSec: r.durationSec,
+    startedAt: r.startedAt,
+    finishedAt: r.finishedAt,
+  }));
+  const totalTime = results.reduce((sum, r) => sum + (r.durationSec || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -72,9 +88,10 @@ export const AdminUserDetails = () => {
             <div className="divide-y border rounded">
               {attendance.length === 0 && <div className="p-3 text-slate-500 text-sm">Nenhum registro.</div>}
               {attendance.map(a => (
-                <div key={a.id} className="p-3 flex justify-between text-sm">
-                  <span>{a.date}</span>
-                  <span className="text-slate-600">{a.content}</span>
+                <div key={a.id} className="p-3 grid grid-cols-6 text-sm gap-2 items-center">
+                  <span className="col-span-1">{a.date}</span>
+                  <span className="col-span-4 text-slate-600">{a.content}</span>
+                  <button onClick={() => delAtt(a.id)} className="text-red-600 hover:text-red-800 text-right">Excluir</button>
                 </div>
               ))}
             </div>
@@ -97,11 +114,12 @@ export const AdminUserDetails = () => {
             <div className="divide-y border rounded">
               {payments.length === 0 && <div className="p-3 text-slate-500 text-sm">Nenhum registro.</div>}
               {payments.map(p => (
-                <div key={p.id} className="p-3 grid grid-cols-4 text-sm gap-2">
+                <div key={p.id} className="p-3 grid grid-cols-5 text-sm gap-2 items-center">
                   <span>{p.date}</span>
                   <span className="font-medium">R$ {Number(p.amount).toFixed(2)}</span>
                   <span className="text-slate-600">{p.method}</span>
                   <span className="text-slate-600">{p.notes}</span>
+                  <button onClick={() => delPay(p.id)} className="text-red-600 hover:text-red-800 text-right">Excluir</button>
                 </div>
               ))}
             </div>
@@ -124,6 +142,35 @@ export const AdminUserDetails = () => {
             <div className="text-slate-500">Último pagamento</div>
             <div className="text-2xl font-bold">{payments.length ? payments[payments.length-1].date : '-'}</div>
           </div>
+        </div>
+      </Card>
+
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Desempenho em Listas</h3>
+          <Button variant="outline" onClick={() => exportCSV(performance, ['quizTitle','score','total','errors','durationSec','startedAt','finishedAt'], `desempenho-${user.name}.csv`)}>Exportar CSV</Button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+          <div className="border rounded p-3 text-sm">
+            <div className="text-slate-500">Listas concluídas</div>
+            <div className="text-2xl font-bold">{results.length}</div>
+          </div>
+          <div className="border rounded p-3 text-sm">
+            <div className="text-slate-500">Tempo total de estudo</div>
+            <div className="text-2xl font-bold">{Math.round(totalTime/60)} min</div>
+          </div>
+        </div>
+        <div className="divide-y border rounded">
+          {performance.length === 0 && <div className="p-3 text-slate-500 text-sm">Nenhum resultado.</div>}
+          {performance.map((r, idx) => (
+            <div key={idx} className="p-3 grid grid-cols-6 gap-2 text-sm items-center">
+              <span className="col-span-2 font-medium">{r.quizTitle}</span>
+              <span>{r.score}/{r.total}</span>
+              <span className="text-red-600">Erros: {r.errors}</span>
+              <span>Duração: {r.durationSec}s</span>
+              <span className="text-slate-500">{r.finishedAt?.slice(0,10)}</span>
+            </div>
+          ))}
         </div>
       </Card>
     </div>

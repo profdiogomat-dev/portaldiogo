@@ -183,6 +183,12 @@ class MockDB {
     this.set('attendance', list);
     if (CloudSync.enabled) CloudSync.upsert('attendance', list[list.length-1]);
   }
+  deleteAttendance(id: string) {
+    const list = this.get<Attendance>('attendance');
+    const next = list.filter(a => a.id !== id);
+    this.set('attendance', next);
+    if (CloudSync.enabled) CloudSync.remove('attendance', id);
+  }
 
   getPayments(userId: string) { return this.get<Payment>('payments').filter(p => p.userId === userId); }
   addPayment(pay: Omit<Payment, 'id'>) {
@@ -190,6 +196,12 @@ class MockDB {
     list.push({ ...pay, id: uid() });
     this.set('payments', list);
     if (CloudSync.enabled) CloudSync.upsert('payments', list[list.length-1]);
+  }
+  deletePayment(id: string) {
+    const list = this.get<Payment>('payments');
+    const next = list.filter(p => p.id !== id);
+    this.set('payments', next);
+    if (CloudSync.enabled) CloudSync.remove('payments', id);
   }
   
   // --- APPOINTMENTS ---

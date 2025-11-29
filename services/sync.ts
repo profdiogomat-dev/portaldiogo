@@ -55,6 +55,12 @@ export const CloudSync = {
     if (error) CloudSync.lastError = error.message;
   },
 
+  async remove<K extends keyof TableMap>(table: K, id: string) {
+    if (!client) return;
+    const { error } = await client.from(table as string).delete().eq('id', id);
+    if (error) CloudSync.lastError = error.message;
+  },
+
   async ping(): Promise<{ ok: boolean; usersCount?: number; error?: string }> {
     if (!client) return { ok: false, error: 'Cliente não inicializado. Verifique variáveis VITE_SUPABASE_URL/KEY.' };
     try {
