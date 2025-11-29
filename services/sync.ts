@@ -53,4 +53,19 @@ export const CloudSync = {
     if (error) { CloudSync.lastError = error.message; return { ok: false, error: error.message }; }
     return { ok: true, usersCount: (data as any)?.length || undefined };
   }
+  ,
+  async count(table: keyof TableMap): Promise<number> {
+    if (!client) return 0;
+    const { count, error } = await client.from(table as string).select('*', { count: 'exact', head: true });
+    if (error) { CloudSync.lastError = error.message; return 0; }
+    return count || 0;
+  },
+  async status() {
+    const tables: (keyof TableMap)[] = ['users','quizzes','questions','results','attempts','attendance','payments','appointments'];
+    const result: Record<string, number> = {};
+    for (const t of tables) {
+      result[t] = await CloudSync.count(t);
+    }
+    return result;
+  }
 };

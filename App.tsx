@@ -54,6 +54,7 @@ const AdminUsers = () => {
     const [syncEnabled, setSyncEnabled] = React.useState(CloudSync.enabled);
     const [cloudInfo, setCloudInfo] = React.useState('');
     const [cloudUsers, setCloudUsers] = React.useState<User[]>([]);
+    const [cloudCounts, setCloudCounts] = React.useState<Record<string, number> | null>(null);
     const deleteUser = (id: string) => {
         if(confirm('Remover usuário?')) {
             db.deleteUser(id);
@@ -102,7 +103,18 @@ const AdminUsers = () => {
         }
         const data = await CloudSync.list('users');
         setCloudUsers(data as any);
+        const counts = await CloudSync.status();
+        setCloudCounts(counts);
         setCloudInfo(`Conexão OK. Users na nuvem: ${data.length}`);
+    };
+
+    const fullSync = async () => {
+        await db.syncUp();
+        await db.syncDown();
+        setUsers(db.getUsers());
+        const counts = await CloudSync.status();
+        setCloudCounts(counts);
+        alert('Full Sync concluído (Up e Down).');
     };
 
     return (
@@ -117,6 +129,7 @@ const AdminUsers = () => {
                     <Button onClick={syncDown}>Sync Down</Button>
                     <Button variant="outline" onClick={syncUp}>Sync Up</Button>
                     <Button variant="outline" onClick={testConnection}>Testar Conexão</Button>
+                    <Button variant="outline" onClick={fullSync}>Full Sync</Button>
                   </>
                 )}
             </div>
@@ -125,6 +138,16 @@ const AdminUsers = () => {
                 <div className="p-3 bg-slate-50 border rounded">
                   <div><strong>Status:</strong> {CloudSync.lastError ? `Erro: ${CloudSync.lastError}` : 'Sem erros registrados'}</div>
                   {cloudInfo && <div className="mt-2">{cloudInfo}</div>}
+                  {cloudCounts && (
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      {Object.entries(cloudCounts).map(([k,v]) => (
+                        <div key={k} className="flex justify-between">
+                          <span>{k}</span>
+                          <span className="font-mono">{v}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {cloudUsers.length > 0 && (
                   <div className="mt-3 p-3 bg-slate-50 border rounded">
