@@ -36,7 +36,7 @@ class MockDB {
   createUser(user: Omit<User, 'id'>) {
     const users = this.get<User>('users');
     if (users.find(u => u.username === user.username)) throw new Error('Username already exists');
-    const newUser = { ...user, id: uid() };
+    const newUser = { ...user, id: uid(), grade: user.grade || 'OUTROS' };
     users.push(newUser);
     this.set('users', users);
     return newUser;
@@ -206,6 +206,26 @@ class MockDB {
     for (const k in data) {
         localStorage.setItem(k, data[k]);
     }
+  }
+
+  mergeDB(json: string) {
+    const incoming = JSON.parse(json);
+    const mergeList = <T extends { id: string }>(key: string) => {
+      const current: T[] = this.get<T>(key);
+      const next: T[] = incoming[key] ? JSON.parse(incoming[key]) : [];
+      const map = new Map<string, T>();
+      current.forEach(i => map.set(i.id, i));
+      next.forEach(i => map.set(i.id, i));
+      this.set<T>(key, Array.from(map.values()));
+    };
+    mergeList<User>('users');
+    mergeList<Quiz>('quizzes');
+    mergeList<Question>('questions');
+    mergeList<Result>('results');
+    mergeList<Attendance>('attendance');
+    mergeList<Payment>('payments');
+    mergeList<Attempt>('attempts');
+    mergeList<Appointment>('appointments');
   }
 }
 

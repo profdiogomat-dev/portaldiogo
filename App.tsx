@@ -13,14 +13,14 @@ import { Button, Card } from './components/ui';
 
 // Mock list page for students
 const StudentQuizzes: React.FC<{ user: User }> = ({ user }) => {
-    const [quizzes, setQuizzes] = React.useState(() => {
+    const compute = () => {
         const all = db.getQuizzes();
-        return all.filter(q => q.grade === user.grade || q.grade === 'OUTROS');
-    });
-    React.useEffect(() => {
-        const all = db.getQuizzes();
-        setQuizzes(all.filter(q => q.grade === user.grade || q.grade === 'OUTROS'));
-    }, [user.grade]);
+        if (!user.grade) return all;
+        const filtered = all.filter(q => q.grade === user.grade || q.grade === 'OUTROS');
+        return filtered.length ? filtered : all;
+    };
+    const [quizzes, setQuizzes] = React.useState(compute());
+    React.useEffect(() => { setQuizzes(compute()); }, [user.grade]);
     return (
         <div className="space-y-6">
             <h1 className="text-2xl font-bold">Listas de Exercícios</h1>
@@ -49,21 +49,52 @@ const StudentQuizzes: React.FC<{ user: User }> = ({ user }) => {
 // Simple Admin User Placeholder
 const AdminUsers = () => {
     const [users, setUsers] = React.useState(db.getUsers());
+    const [file, setFile] = React.useState<File | null>(null);
     const deleteUser = (id: string) => {
         if(confirm('Remover usuário?')) {
             db.deleteUser(id);
             setUsers(db.getUsers());
         }
     }
+    const handleGrade = (id: string, grade: string) => {
+        db.updateUser(id, { grade });
+        setUsers(db.getUsers());
+    };
+
+    const exportDB = () => {
+        const data = db.exportDB();
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'portal-backup.json';
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const importMerge = async () => {
+        if (!file) return;
+        const text = await file.text();
+        db.mergeDB(text);
+        setUsers(db.getUsers());
+        alert('Dados mesclados. Usuários e listas sincronizados.');
+    };
+
     return (
         <div className="space-y-6">
             <h1 className="text-2xl font-bold">Gerenciar Usuários</h1>
+            <div className="flex gap-2">
+                <Button onClick={exportDB}>Exportar Dados</Button>
+                <input type="file" accept="application/json" onChange={e => setFile(e.target.files?.[0] || null)} />
+                <Button variant="outline" onClick={importMerge} disabled={!file}>Importar/Mesclar</Button>
+            </div>
             <div className="bg-white rounded-lg shadow overflow-hidden">
                 <table className="min-w-full divide-y divide-slate-200">
                     <thead className="bg-slate-50">
                         <tr>
                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Nome</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Role</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Série</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Ações</th>
                         </tr>
                     </thead>
@@ -72,6 +103,22 @@ const AdminUsers = () => {
                             <tr key={u.id}>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{u.name}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{u.role}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                                    {u.role === Role.Student ? (
+                                        <select value={u.grade || 'OUTROS'} onChange={e => handleGrade(u.id, e.target.value)} className="border rounded px-2 py-1 text-sm">
+                                            <option value="6EF">6º ano EF</option>
+                                            <option value="7EF">7º ano EF</option>
+                                            <option value="8EF">8º ano EF</option>
+                                            <option value="9EF">9º ano EF</option>
+                                            <option value="1EM">1ª série EM</option>
+                                            <option value="2EM">2ª série EM</option>
+                                            <option value="3EM">3ª série EM</option>
+                                            <option value="OUTROS">Outros / Não definido</option>
+                                        </select>
+                                    ) : (
+                                        '-'
+                                    )}
+                                </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                                     {u.role !== Role.Teacher && <button onClick={() => deleteUser(u.id)} className="text-red-600 hover:text-red-900">Excluir</button>}
                                 </td>
