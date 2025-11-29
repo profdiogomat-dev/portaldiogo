@@ -15,10 +15,18 @@ class MockDB {
 
   // --- INIT ---
   init() {
-    const setupDone = localStorage.getItem('setupDone');
-    if (!setupDone) {
-      this.resetUsersAndQuizzes('profdiogo', 'poli0402');
-      localStorage.setItem('setupDone', 'true');
+    const users = this.get<User>('users');
+    const hasTeacher = users.some(u => u.role === Role.Teacher);
+    if (!hasTeacher) {
+      users.push({
+        id: 'teacher-1',
+        name: 'Administrador',
+        username: 'profdiogo',
+        password: 'poli0402',
+        role: Role.Teacher,
+        blocked: false
+      });
+      this.set('users', users);
     }
   }
 

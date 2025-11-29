@@ -8,27 +8,40 @@ import { AdminQuizEditor } from './pages/AdminQuizEditor';
 import { Schedule } from './pages/Schedule';
 import { Layout } from './components/Layout';
 import { db } from './services/db';
-import { User, Role } from './types';
+import { User, Role, SUBJECT_LABELS } from './types';
 import { Button, Card } from './components/ui';
 
 // Mock list page for students
-const StudentQuizzes = () => {
-    const [quizzes, setQuizzes] = React.useState(db.getQuizzes());
+const StudentQuizzes: React.FC<{ user: User }> = ({ user }) => {
+    const [quizzes, setQuizzes] = React.useState(() => {
+        const all = db.getQuizzes();
+        return all.filter(q => q.grade === user.grade || q.grade === 'OUTROS');
+    });
+    React.useEffect(() => {
+        const all = db.getQuizzes();
+        setQuizzes(all.filter(q => q.grade === user.grade || q.grade === 'OUTROS'));
+    }, [user.grade]);
     return (
         <div className="space-y-6">
             <h1 className="text-2xl font-bold">Listas de Exercícios</h1>
+            {quizzes.length === 0 ? (
+                <Card className="p-6">
+                    <p className="text-slate-600 text-sm">Nenhuma lista disponível para sua série.</p>
+                </Card>
+            ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {quizzes.map(q => (
                     <Card key={q.id} className="p-6 hover:shadow-lg transition-shadow border-t-4 border-t-indigo-500 cursor-pointer">
                         <h3 className="font-bold text-lg mb-2">{q.title}</h3>
                         <p className="text-sm text-slate-500 mb-4 line-clamp-2">{q.description || 'Sem descrição.'}</p>
                         <div className="flex justify-between items-center">
-                            <span className="text-xs font-semibold bg-slate-100 px-2 py-1 rounded text-slate-600">{q.subject === 'math' ? 'Matemática' : 'Química'}</span>
+                            <span className="text-xs font-semibold bg-slate-100 px-2 py-1 rounded text-slate-600">{SUBJECT_LABELS[q.subject]}</span>
                             <Button onClick={() => window.location.hash = `#/quiz/${q.id}`} variant="outline" className="text-xs h-8">Começar</Button>
                         </div>
                     </Card>
                 ))}
             </div>
+            )}
         </div>
     )
 }
@@ -106,7 +119,7 @@ function App() {
           <Route path="/" element={<Dashboard user={user} />} />
           
           {/* Student Routes */}
-          <Route path="/quizzes" element={<StudentQuizzes />} />
+          <Route path="/quizzes" element={<StudentQuizzes user={user} />} />
           <Route path="/quiz/:id" element={<QuizPlayer />} />
           <Route path="/schedule" element={<Schedule />} />
           
