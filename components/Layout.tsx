@@ -13,6 +13,11 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const [viewAsStudent, setViewAsStudent] = React.useState<boolean>(() => {
+    const v = localStorage.getItem('viewAsStudent');
+    return v === 'true';
+  });
 
   const teacherLinks = [
     { href: '/', label: 'Início', icon: Home },
@@ -29,7 +34,14 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
     { href: '/profile', label: 'Meu Perfil', icon: Settings },
   ];
 
-  const links = user.role === Role.Teacher ? teacherLinks : studentLinks;
+  const links = viewAsStudent ? studentLinks : (user.role === Role.Teacher ? teacherLinks : studentLinks);
+
+  const toggleView = () => {
+    const next = !viewAsStudent;
+    setViewAsStudent(next);
+    localStorage.setItem('viewAsStudent', String(next));
+    navigate(next ? '/quizzes' : '/');
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -66,6 +78,14 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
             <p className="text-sm font-medium text-slate-900">{user.name}</p>
             <p className="text-xs text-slate-500 capitalize">{user.role}</p>
           </div>
+          {user.role === Role.Teacher && (
+            <button
+              onClick={toggleView}
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 mb-2"
+            >
+              {viewAsStudent ? 'Ver como Professor' : 'Ver como Aluno'}
+            </button>
+          )}
           <button
             onClick={onLogout}
             className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
@@ -88,15 +108,23 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, children }) => {
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-10 bg-white pt-16 md:hidden px-4 pb-8 space-y-2">
             {links.map((link) => (
-                <Link
-                    key={link.href}
-                    to={link.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="block p-3 rounded-lg bg-slate-50 font-medium text-slate-800"
-                >
-                    {link.label}
-                </Link>
+              <Link
+                key={link.href}
+                to={link.href}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block p-3 rounded-lg bg-slate-50 font-medium text-slate-800"
+              >
+                {link.label}
+              </Link>
             ))}
+            {user.role === Role.Teacher && (
+              <button
+                onClick={() => { toggleView(); setIsMobileMenuOpen(false); }}
+                className="w-full text-left p-3 rounded-lg bg-indigo-50 text-indigo-700 font-medium"
+              >
+                {viewAsStudent ? 'Ver como Professor' : 'Ver como Aluno'}
+              </button>
+            )}
              <button
                 onClick={onLogout}
                 className="w-full text-left p-3 rounded-lg bg-red-50 text-red-700 font-medium mt-4"
