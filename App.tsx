@@ -138,6 +138,10 @@ const AdminUsers = () => {
                 <div className="p-3 bg-slate-50 border rounded">
                   <div><strong>Status:</strong> {CloudSync.lastError ? `Erro: ${CloudSync.lastError}` : 'Sem erros registrados'}</div>
                   {cloudInfo && <div className="mt-2">{cloudInfo}</div>}
+                  <div className="mt-2 text-xs text-slate-500">
+                    <div>Env URL: {CloudSync.envStatus.hasUrl ? 'OK' : 'FALTANDO'}</div>
+                    <div>Env KEY: {CloudSync.envStatus.hasKey ? 'OK' : 'FALTANDO'}</div>
+                  </div>
                   {cloudCounts && (
                     <div className="mt-2 grid grid-cols-2 gap-2">
                       {Object.entries(cloudCounts).map(([k,v]) => (

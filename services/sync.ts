@@ -27,6 +27,10 @@ try {
 export const CloudSync = {
   enabled: !!client,
   lastError: null as string | null,
+  envStatus: {
+    hasUrl: !!url,
+    hasKey: !!key,
+  },
 
   async list<K extends keyof TableMap>(table: K): Promise<TableMap[K][]> {
     if (!client) return [] as TableMap[K][];
@@ -49,9 +53,14 @@ export const CloudSync = {
 
   async ping(): Promise<{ ok: boolean; usersCount?: number; error?: string }> {
     if (!client) return { ok: false, error: 'Cliente não inicializado. Verifique variáveis VITE_SUPABASE_URL/KEY.' };
-    const { data, error } = await client.from('users').select('id', { count: 'exact', head: true });
-    if (error) { CloudSync.lastError = error.message; return { ok: false, error: error.message }; }
-    return { ok: true, usersCount: (data as any)?.length || undefined };
+    try {
+      const { count, error } = await client.from('users').select('id', { count: 'exact' }).limit(1);
+      if (error) { CloudSync.lastError = error.message; return { ok: false, error: error.message }; }
+      return { ok: true, usersCount: count ?? 0 };
+    } catch (e: any) {
+      CloudSync.lastError = e?.message || String(e);
+      return { ok: false, error: CloudSync.lastError };
+    }
   },
   async count(table: keyof TableMap): Promise<number> {
     if (!client) return 0;
