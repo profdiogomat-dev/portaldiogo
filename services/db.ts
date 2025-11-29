@@ -1,4 +1,4 @@
-import { User, Quiz, Question, Result, Attendance, Payment, Role, Subject, Attempt } from '../types';
+import { User, Quiz, Question, Result, Attendance, Payment, Role, Subject, Attempt, Appointment } from '../types';
 
 // Helper to generate IDs
 const uid = () => Math.random().toString(36).substr(2, 9);
@@ -172,6 +172,20 @@ class MockDB {
     const list = this.get<Payment>('payments');
     list.push({ ...pay, id: uid() });
     this.set('payments', list);
+  }
+  
+  // --- APPOINTMENTS ---
+  getAppointments(date?: string) {
+    const list = this.get<Appointment>('appointments');
+    if (!date) return list;
+    return list.filter(a => a.dateTime.startsWith(date));
+  }
+  addAppointment(app: Omit<Appointment, 'id' | 'createdAt'>) {
+    const list = this.get<Appointment>('appointments');
+    const newApp = { ...app, id: uid(), createdAt: new Date().toISOString() };
+    list.push(newApp);
+    this.set('appointments', list);
+    return newApp;
   }
   
   // Backup/Restore

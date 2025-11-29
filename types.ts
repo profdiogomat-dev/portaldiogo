@@ -88,6 +88,14 @@ export interface Payment {
   notes?: string;
 }
 
+export interface Appointment {
+  id: string;
+  userId: string;
+  dateTime: string;
+  durationMin: number;
+  createdAt: string;
+}
+
 // GRADE OPTIONS
 export const GRADE_OPTIONS = {
   '6EF': '6º ano EF',
