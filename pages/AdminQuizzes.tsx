@@ -2,6 +2,7 @@ import React from 'react';
 import { db } from '../services/db';
 import { Quiz, Question, Subject, GRADE_OPTIONS, SUBJECT_LABELS } from '../types';
 import { Button, Card, Input, Select, Modal, Badge } from '../components/ui';
+import * as mammoth from 'mammoth';
 import { Trash2, Plus, Edit, Upload } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -14,6 +15,10 @@ export const AdminQuizzes = () => {
   const [isImportOpen, setIsImportOpen] = React.useState(false);
   const [importText, setImportText] = React.useState('');
   const [importConfig, setImportConfig] = React.useState({ title: '', grade: 'OUTROS', subject: Subject.Math });
+  const [files, setFiles] = React.useState<FileList | null>(null);
+  const [isBatch, setIsBatch] = React.useState(false);
+  const [progressOpen, setProgressOpen] = React.useState(false);
+  const [progressQuizId, setProgressQuizId] = React.useState<string>('');
 
   const load = () => setQuizzes(db.getQuizzes());
   React.useEffect(load, []);
@@ -41,9 +46,9 @@ export const AdminQuizzes = () => {
     }
   };
 
-  const parseAndImport = () => {
+  const parseFromText = (text: string) => {
     // Basic parser based on the PHP logic
-    const blocks = importText.split(/\n-{3,}\n/);
+    const blocks = text.split(/\n-{3,}\n/);
     const questionsToImport: any[] = [];
     
     blocks.forEach(block => {
@@ -86,10 +91,40 @@ export const AdminQuizzes = () => {
         alert(`Sucesso! ${questionsToImport.length} questões importadas.`);
         setIsImportOpen(false);
         setImportText('');
+        setFiles(null);
         load();
     } else {
         alert('Falha ao analisar o texto. Verifique o formato.');
     }
+  };
+
+  const readFileText = async (file: File) => {
+    if (file.name.toLowerCase().endsWith('.docx')) {
+      const buffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer: buffer });
+      return result.value;
+    }
+    return await file.text();
+  };
+
+  const parseAndImport = async () => {
+    if (files && files.length > 0) {
+      if (isBatch) {
+        for (let i = 0; i < files.length; i++) {
+          const f = files[i];
+          const text = await readFileText(f);
+          const title = f.name.replace(/\.(txt|docx)$/i, '');
+          setImportConfig(prev => ({ ...prev, title }));
+          parseFromText(text);
+        }
+        return;
+      } else {
+        const text = await readFileText(files[0]);
+        parseFromText(text);
+        return;
+      }
+    }
+    parseFromText(importText);
   };
 
   return (
@@ -120,6 +155,7 @@ export const AdminQuizzes = () => {
                     <Link to={`/admin/quiz/${q.id}`}>
                         <Button variant="outline" className="h-9 px-3">Editar Questões</Button>
                     </Link>
+                    <Button variant="ghost" className="h-9 px-3" onClick={() => { setProgressQuizId(q.id); setProgressOpen(true); }}>Progresso</Button>
                     <button onClick={() => handleDelete(q.id)} className="text-red-500 hover:bg-red-50 p-2 rounded">
                         <Trash2 size={18} />
                     </button>
@@ -161,11 +197,10 @@ export const AdminQuizzes = () => {
       </Modal>
 
       {/* IMPORT MODAL */}
-      <Modal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} title="Importar Texto">
+      <Modal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} title="Importar Listas">
         <div className="space-y-4">
             <p className="text-xs text-slate-500">
-                Cole o texto no formato: <code>PERGUNTA: ... A) ... CORRETA: A ...</code> <br/>
-                Separe questões com <code>---</code>.
+                Suporte a formato de texto colado, arquivos <code>.txt</code> e <code>.docx</code>. Separe questões com <code>---</code>.
             </p>
             <Input 
                 placeholder="Título da nova lista" 
@@ -181,6 +216,13 @@ export const AdminQuizzes = () => {
                     {Object.entries(GRADE_OPTIONS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
                 </Select>
             </div>
+                <div className="flex items-center gap-3">
+                  <input type="file" multiple accept=".txt,.docx" onChange={e => setFiles(e.target.files)} />
+                  <label className="text-sm flex items-center gap-2">
+                    <input type="checkbox" checked={isBatch} onChange={e => setIsBatch(e.target.checked)} />
+                    Importar cada arquivo como uma lista separada
+                  </label>
+                </div>
             <textarea 
                 className="w-full h-48 border rounded-md p-2 text-sm font-mono"
                 placeholder="Cole o conteúdo aqui..."
@@ -192,6 +234,55 @@ export const AdminQuizzes = () => {
             </div>
         </div>
       </Modal>
+
+      <Modal isOpen={progressOpen} onClose={() => setProgressOpen(false)} title="Progresso da Lista">
+        <div className="space-y-4">
+          {progressQuizId && (
+            <ProgressBody quizId={progressQuizId} />
+          )}
+        </div>
+      </Modal>
+    </div>
+  );
+};
+
+const ProgressBody = ({ quizId }: { quizId: string }) => {
+  const users = db.getUsers();
+  const attempts = db.getAttemptsByQuiz(quizId);
+  const results = db.getResultsByQuiz(quizId);
+  const findUser = (id: string) => users.find(u => u.id === id)?.name || id;
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="font-semibold mb-2">Em andamento</h3>
+        {attempts.length === 0 && <div className="text-sm text-slate-500">Nenhum aluno em andamento.</div>}
+        {attempts.map(a => (
+          <Card key={a.id} className="p-4 flex justify-between items-center">
+            <div>
+              <div className="font-medium">{findUser(a.userId)}</div>
+              <div className="text-xs text-slate-500">Início: {new Date(a.startedAt).toLocaleString()}</div>
+            </div>
+            <div className="text-sm">Última questão: {a.lastIndex + 1}</div>
+            <div className="text-xs text-slate-500">Respondidas: {Object.keys(a.answers).length}</div>
+          </Card>
+        ))}
+      </div>
+      <div>
+        <h3 className="font-semibold mb-2">Finalizados</h3>
+        {results.length === 0 && <div className="text-sm text-slate-500">Nenhum resultado.</div>}
+        {results.map(r => (
+          <Card key={r.id} className="p-4">
+            <div className="flex justify-between">
+              <div>
+                <div className="font-medium">{findUser(r.userId)}</div>
+                <div className="text-xs text-slate-500">Data: {new Date(r.date).toLocaleString()}</div>
+              </div>
+              <div className="text-sm">{r.score}/{r.total}</div>
+            </div>
+            <div className="mt-2 text-xs text-slate-500">Duração: {r.durationSec ? r.durationSec + 's' : '-'}</div>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 };

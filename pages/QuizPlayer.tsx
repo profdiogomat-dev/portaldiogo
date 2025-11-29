@@ -16,6 +16,8 @@ export const QuizPlayer = () => {
   const [stepFeedback, setStepFeedback] = React.useState<{isCorrect: boolean, show: boolean}>({ isCorrect: false, show: false });
   const [submitted, setSubmitted] = React.useState(false);
   const [score, setScore] = React.useState(0);
+  const [attemptId, setAttemptId] = React.useState<string | null>(null);
+  const [startedAt, setStartedAt] = React.useState<number>(0);
   const goToIndex = (i: number) => {
     setStepFeedback({ show: false, isCorrect: false });
     setCurrentIdx(i);
@@ -31,6 +33,16 @@ export const QuizPlayer = () => {
     }
   }, [id]);
 
+  React.useEffect(() => {
+    if (!quiz) return;
+    const userJson = localStorage.getItem('currentUser');
+    if (!userJson) return;
+    const u = JSON.parse(userJson);
+    const att = db.startAttempt(u.id, quiz.id);
+    setAttemptId(att.id);
+    setStartedAt(Date.now());
+  }, [quiz]);
+
   if (!quiz) return <div className="p-8 text-center">Carregando lista...</div>;
 
   const currentQ = questions[currentIdx];
@@ -42,6 +54,9 @@ export const QuizPlayer = () => {
     if (mode === 'step' && stepFeedback.show) return; // Lock if showing feedback
 
     setAnswers(prev => ({ ...prev, [currentQ.id]: option }));
+    if (attemptId) {
+      db.updateAttempt(attemptId, { answers: { ...answers, [currentQ.id]: option } });
+    }
   };
 
   const checkStep = () => {
@@ -54,7 +69,9 @@ export const QuizPlayer = () => {
   const nextQuestion = () => {
     setStepFeedback({ show: false, isCorrect: false });
     if (currentIdx < total - 1) {
-      setCurrentIdx(prev => prev + 1);
+      const next = currentIdx + 1;
+      setCurrentIdx(next);
+      if (attemptId) db.updateAttempt(attemptId, { lastIndex: next });
     } else {
         finishQuiz();
     }
@@ -71,11 +88,17 @@ export const QuizPlayer = () => {
     const userJson = localStorage.getItem('currentUser');
     if(userJson) {
         const u = JSON.parse(userJson);
+        const finishedAtMs = Date.now();
+        const durationSec = Math.round((finishedAtMs - startedAt) / 1000);
+        if (attemptId) db.finishAttempt(attemptId);
         db.saveResult({
             userId: u.id,
             quizId: quiz.id,
             score: s,
             total: total,
+            durationSec,
+            startedAt: new Date(startedAt).toISOString(),
+            finishedAt: new Date(finishedAtMs).toISOString(),
             details: questions.map(q => ({
                 questionId: q.id,
                 chosen: answers[q.id] || '',

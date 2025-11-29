@@ -16,6 +16,7 @@ export interface User {
   role: Role;
   grade?: string;
   phone?: string;
+  email?: string;
   blocked: boolean;
   resetCode?: string;
 }
@@ -52,11 +53,23 @@ export interface Result {
   score: number;
   total: number;
   date: string;
+  durationSec?: number;
+  startedAt?: string;
+  finishedAt?: string;
   details: {
     questionId: string;
     chosen: string;
     isCorrect: boolean;
   }[];
+}
+
+export interface Attempt {
+  id: string;
+  userId: string;
+  quizId: string;
+  startedAt: string;
+  lastIndex: number;
+  answers: Record<string, string>;
 }
 
 export interface Attendance {

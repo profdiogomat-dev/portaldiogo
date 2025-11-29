@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { Role, GRADE_OPTIONS } from '../types';
 import { Input, Button, Select } from '../components/ui';
-import { BookOpen, CheckCircle2, TrendingUp, Sparkles } from 'lucide-react';
+import { BookOpen, CheckCircle2, TrendingUp, Sparkles, Eye, EyeOff } from 'lucide-react';
 
 export const Login = ({ onLogin }: { onLogin: (user: any) => void }) => {
   const navigate = useNavigate();
@@ -13,9 +13,14 @@ export const Login = ({ onLogin }: { onLogin: (user: any) => void }) => {
   // Login State
   const [username, setUsername] = React.useState('');
   const [password, setPassword] = React.useState('');
+  const [showLoginPwd, setShowLoginPwd] = React.useState(false);
 
   // Register State
-  const [regData, setRegData] = React.useState({ name: '', username: '', password: '', grade: 'OUTROS' });
+  const [regData, setRegData] = React.useState({ name: '', username: '', password: '', grade: 'OUTROS', email: '', phone: '' });
+  const [showRegPwd, setShowRegPwd] = React.useState(false);
+  const [isResetOpen, setIsResetOpen] = React.useState(false);
+  const [resetUser, setResetUser] = React.useState('');
+  const [resetPwd, setResetPwd] = React.useState('');
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,9 +146,26 @@ export const Login = ({ onLogin }: { onLogin: (user: any) => void }) => {
                                 </div>
                             </div>
 
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-sm font-semibold text-slate-700 ml-1">Email</label>
+                                    <Input placeholder="email@exemplo.com" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})} className="bg-slate-50 border-slate-200 focus:bg-white h-11" />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-sm font-semibold text-slate-700 ml-1">Telefone</label>
+                                    <Input placeholder="(00) 90000-0000" value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})} className="bg-slate-50 border-slate-200 focus:bg-white h-11" />
+                                </div>
+                            </div>
+
                             <div className="space-y-1">
-                                <label className="text-sm font-semibold text-slate-700 ml-1">Senha</label>
-                                <Input type="password" placeholder="••••••••" value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} className="bg-slate-50 border-slate-200 focus:bg-white h-11" />
+                                <div className="flex justify-between items-center px-1">
+                                    <label className="text-sm font-semibold text-slate-700">Senha</label>
+                                    <button type="button" className="text-xs text-indigo-600" onClick={() => setShowRegPwd(v => !v)}>{showRegPwd ? 'Ocultar' : 'Mostrar'}</button>
+                                </div>
+                                <div className="relative">
+                                  <Input type={showRegPwd ? 'text' : 'password'} placeholder="••••••••" value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} className="bg-slate-50 border-slate-200 focus:bg-white h-11 pr-10" />
+                                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">{showRegPwd ? <EyeOff size={16}/> : <Eye size={16}/>}</span>
+                                </div>
                             </div>
 
                             <Button className="w-full h-12 text-base shadow-lg shadow-indigo-200 mt-2">Cadastrar</Button>
@@ -157,9 +179,12 @@ export const Login = ({ onLogin }: { onLogin: (user: any) => void }) => {
                             <div className="space-y-1">
                                 <div className="flex justify-between items-center px-1">
                                     <label className="text-sm font-semibold text-slate-700">Senha</label>
-                                    <span className="text-xs text-indigo-600 cursor-pointer hover:underline">Esqueceu?</span>
+                                    <button type="button" className="text-xs text-indigo-600 hover:underline" onClick={() => setIsResetOpen(true)}>Esqueceu?</button>
                                 </div>
-                                <Input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="bg-slate-50 border-slate-200 focus:bg-white h-11" />
+                                <div className="relative">
+                                  <Input type={showLoginPwd ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="bg-slate-50 border-slate-200 focus:bg-white h-11 pr-10" />
+                                  <button type="button" onClick={() => setShowLoginPwd(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600">{showLoginPwd ? <EyeOff size={16}/> : <Eye size={16}/>}</button>
+                                </div>
                             </div>
 
                             <Button className="w-full h-12 text-base shadow-lg shadow-indigo-200 mt-2">Entrar</Button>
@@ -178,6 +203,28 @@ export const Login = ({ onLogin }: { onLogin: (user: any) => void }) => {
                         </p>
                     </div>
                 </div>
+                {isResetOpen && (
+                  <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl p-6 w-full max-w-sm">
+                      <h3 className="font-semibold mb-4">Redefinir senha</h3>
+                      <div className="space-y-3">
+                        <Input placeholder="Usuário" value={resetUser} onChange={e => setResetUser(e.target.value)} />
+                        <Input placeholder="Nova senha" type="password" value={resetPwd} onChange={e => setResetPwd(e.target.value)} />
+                        <div className="flex justify-end gap-2 mt-2">
+                          <Button variant="outline" onClick={() => setIsResetOpen(false)}>Cancelar</Button>
+                          <Button onClick={() => {
+                            const users = db.getUsers();
+                            const u = users.find(x => x.username === resetUser);
+                            if (!u) { setError('Usuário não encontrado.'); return; }
+                            db.updateUser(u.id, { password: resetPwd });
+                            setIsResetOpen(false);
+                            alert('Senha atualizada.');
+                          }}>Salvar</Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
             </div>
         </div>
     </div>

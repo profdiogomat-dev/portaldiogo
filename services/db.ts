@@ -1,4 +1,4 @@
-import { User, Quiz, Question, Result, Attendance, Payment, Role, Subject } from '../types';
+import { User, Quiz, Question, Result, Attendance, Payment, Role, Subject, Attempt } from '../types';
 
 // Helper to generate IDs
 const uid = () => Math.random().toString(36).substr(2, 9);
@@ -128,6 +128,35 @@ class MockDB {
     const newRes = { ...result, id: uid(), date: new Date().toISOString() };
     results.push(newRes);
     this.set('results', results);
+  }
+
+  // --- ATTEMPTS ---
+  startAttempt(userId: string, quizId: string) {
+    const attempts = this.get<Attempt>('attempts');
+    const existing = attempts.find(a => a.userId === userId && a.quizId === quizId);
+    if (existing) return existing;
+    const att: Attempt = { id: uid(), userId, quizId, startedAt: new Date().toISOString(), lastIndex: 0, answers: {} };
+    attempts.push(att);
+    this.set('attempts', attempts);
+    return att;
+  }
+  updateAttempt(attId: string, data: Partial<Attempt>) {
+    const attempts = this.get<Attempt>('attempts');
+    const idx = attempts.findIndex(a => a.id === attId);
+    if (idx === -1) return;
+    attempts[idx] = { ...attempts[idx], ...data } as Attempt;
+    this.set('attempts', attempts);
+  }
+  finishAttempt(attId: string) {
+    const attempts = this.get<Attempt>('attempts');
+    const att = attempts.find(a => a.id === attId);
+    if (!att) return;
+    const filtered = attempts.filter(a => a.id !== attId);
+    this.set('attempts', filtered);
+    return att;
+  }
+  getAttemptsByQuiz(quizId: string) {
+    return this.get<Attempt>('attempts').filter(a => a.quizId === quizId);
   }
 
   // --- EXTRAS ---

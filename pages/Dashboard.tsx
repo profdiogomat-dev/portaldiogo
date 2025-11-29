@@ -9,6 +9,14 @@ import { Link } from 'react-router-dom';
 export const Dashboard = ({ user }: { user: User }) => {
   const [stats, setStats] = React.useState({ users: 0, quizzes: 0, questions: 0, attempts: 0 });
   const [recentQuizzes, setRecentQuizzes] = React.useState<Quiz[]>([]);
+  const [attUser, setAttUser] = React.useState<string>('');
+  const [attDate, setAttDate] = React.useState('');
+  const [attContent, setAttContent] = React.useState('');
+  const [payUser, setPayUser] = React.useState<string>('');
+  const [payAmount, setPayAmount] = React.useState('');
+  const [payDate, setPayDate] = React.useState('');
+  const [payMethod, setPayMethod] = React.useState('');
+  const [payNotes, setPayNotes] = React.useState('');
 
   React.useEffect(() => {
     setStats({
@@ -119,6 +127,55 @@ export const Dashboard = ({ user }: { user: User }) => {
           </div>
         </Card>
       </div>
+
+      {user.role === Role.Teacher && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Registrar Frequência</h3>
+            <div className="space-y-3">
+              <select className="border rounded h-10 px-3" value={attUser} onChange={e => setAttUser(e.target.value)}>
+                <option value="">Selecione o aluno</option>
+                {db.getUsers().filter(u => u.role === Role.Student).map(u => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+              <input className="border rounded h-10 px-3" type="date" value={attDate} onChange={e => setAttDate(e.target.value)} />
+              <textarea className="border rounded px-3 py-2 h-24" placeholder="Conteúdo da aula" value={attContent} onChange={e => setAttContent(e.target.value)} />
+              <div className="flex justify-end">
+                <Button onClick={() => {
+                  if (!attUser || !attDate) return;
+                  db.addAttendance({ userId: attUser, date: attDate, content: attContent });
+                  setAttUser(''); setAttDate(''); setAttContent('');
+                  alert('Frequência registrada');
+                }}>Salvar</Button>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Registrar Pagamento</h3>
+            <div className="space-y-3">
+              <select className="border rounded h-10 px-3" value={payUser} onChange={e => setPayUser(e.target.value)}>
+                <option value="">Selecione o aluno</option>
+                {db.getUsers().filter(u => u.role === Role.Student).map(u => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+              <input className="border rounded h-10 px-3" type="number" placeholder="Valor" value={payAmount} onChange={e => setPayAmount(e.target.value)} />
+              <input className="border rounded h-10 px-3" type="date" value={payDate} onChange={e => setPayDate(e.target.value)} />
+              <input className="border rounded h-10 px-3" placeholder="Método" value={payMethod} onChange={e => setPayMethod(e.target.value)} />
+              <input className="border rounded h-10 px-3" placeholder="Notas" value={payNotes} onChange={e => setPayNotes(e.target.value)} />
+              <div className="flex justify-end">
+                <Button onClick={() => {
+                  if (!payUser || !payAmount || !payDate) return;
+                  db.addPayment({ userId: payUser, amount: Number(payAmount), date: payDate, method: payMethod, notes: payNotes });
+                  setPayUser(''); setPayAmount(''); setPayDate(''); setPayMethod(''); setPayNotes('');
+                  alert('Pagamento registrado');
+                }}>Salvar</Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
