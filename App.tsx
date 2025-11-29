@@ -11,6 +11,9 @@ import { db } from './services/db';
 import { User, Role, SUBJECT_LABELS } from './types';
 import { Button, Card } from './components/ui';
 import { CloudSync } from './services/sync';
+import { AdminUserDetails } from './pages/AdminUserDetails';
+import { QuemSouEu } from './pages/QuemSouEu';
+import { Privacidade } from './pages/Privacidade';
 
 // Mock list page for students
 const StudentQuizzes: React.FC<{ user: User }> = ({ user }) => {
@@ -55,6 +58,9 @@ const AdminUsers = () => {
     const [cloudInfo, setCloudInfo] = React.useState('');
     const [cloudUsers, setCloudUsers] = React.useState<User[]>([]);
     const [cloudCounts, setCloudCounts] = React.useState<Record<string, number> | null>(null);
+    const [supEmail, setSupEmail] = React.useState('');
+    const [supPwd, setSupPwd] = React.useState('');
+    const [authMsg, setAuthMsg] = React.useState('');
     const deleteUser = (id: string) => {
         if(confirm('Remover usuário?')) {
             db.deleteUser(id);
@@ -108,6 +114,16 @@ const AdminUsers = () => {
         setCloudInfo(`Conexão OK. Users na nuvem: ${data.length}`);
     };
 
+    const supLogin = async () => {
+        const r = await CloudSync.login(supEmail, supPwd);
+        if (!r.ok) setAuthMsg(`Falha ao entrar: ${r.error}`);
+        else setAuthMsg('Autenticado com Supabase.');
+    };
+    const supLogout = async () => {
+        await CloudSync.logout();
+        setAuthMsg('Sessão Supabase encerrada.');
+    };
+
     const fullSync = async () => {
         await db.syncUp();
         await db.syncDown();
@@ -141,6 +157,7 @@ const AdminUsers = () => {
                   <div className="mt-2 text-xs text-slate-500">
                     <div>Env URL: {CloudSync.envStatus.hasUrl ? 'OK' : 'FALTANDO'}</div>
                     <div>Env KEY: {CloudSync.envStatus.hasKey ? 'OK' : 'FALTANDO'}</div>
+                    <div>Auth: {CloudSync.authStatus.loggedIn ? `logado (${CloudSync.authStatus.email})` : 'não logado'}</div>
                   </div>
                   {cloudCounts && (
                     <div className="mt-2 grid grid-cols-2 gap-2">
@@ -152,6 +169,19 @@ const AdminUsers = () => {
                       ))}
                     </div>
                   )}
+                  <div className="mt-3 flex items-end gap-2">
+                    <div className="flex flex-col">
+                      <label className="text-xs text-slate-500">Email (Supabase)</label>
+                      <input className="border rounded px-2 py-1 text-sm" value={supEmail} onChange={e => setSupEmail(e.target.value)} />
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-xs text-slate-500">Senha</label>
+                      <input type="password" className="border rounded px-2 py-1 text-sm" value={supPwd} onChange={e => setSupPwd(e.target.value)} />
+                    </div>
+                    <Button variant="outline" onClick={supLogin}>Entrar</Button>
+                    <Button variant="outline" onClick={supLogout}>Sair</Button>
+                    {authMsg && <span className="text-xs text-slate-500 ml-2">{authMsg}</span>}
+                  </div>
                 </div>
                 {cloudUsers.length > 0 && (
                   <div className="mt-3 p-3 bg-slate-50 border rounded">
@@ -166,8 +196,8 @@ const AdminUsers = () => {
               </div>
             )}
             <div className="bg-white rounded-lg shadow overflow-hidden">
-                <table className="min-w-full divide-y divide-slate-200">
-                    <thead className="bg-slate-50">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50">
                         <tr>
                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Nome</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Role</th>
@@ -197,7 +227,10 @@ const AdminUsers = () => {
                                     )}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                                    {u.role !== Role.Teacher && <button onClick={() => deleteUser(u.id)} className="text-red-600 hover:text-red-900">Excluir</button>}
+                                    <div className="flex gap-3">
+                                      {u.role !== Role.Teacher && <button onClick={() => deleteUser(u.id)} className="text-red-600 hover:text-red-900">Excluir</button>}
+                                      <a href={`#/admin/user/${u.id}`} className="text-indigo-600 hover:text-indigo-800">Frequência/Pagamentos</a>
+                                    </div>
                                 </td>
                             </tr>
                         ))}
@@ -246,6 +279,8 @@ function App() {
           <Route path="/quizzes" element={<StudentQuizzes user={user} />} />
           <Route path="/quiz/:id" element={<QuizPlayer />} />
           <Route path="/schedule" element={<Schedule />} />
+          <Route path="/quem-sou-eu" element={<QuemSouEu />} />
+          <Route path="/privacidade" element={<Privacidade />} />
           
           {/* Admin Routes */}
           {user.role === Role.Teacher && (
@@ -253,6 +288,7 @@ function App() {
                 <Route path="/admin/quizzes" element={<AdminQuizzes />} />
                 <Route path="/admin/users" element={<AdminUsers />} />
                 <Route path="/admin/quiz/:id" element={<AdminQuizEditor />} />
+                <Route path="/admin/user/:id" element={<AdminUserDetails />} />
             </>
           )}
 

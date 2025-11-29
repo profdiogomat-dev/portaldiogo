@@ -61,13 +61,18 @@ export const Dashboard = ({ user }: { user: User }) => {
                 {user.role === Role.Teacher
                 ? 'Aqui está o resumo da sua turma hoje.'
                 : 'Pronto para aprender algo novo?'}
-            </p>
+          </p>
         </div>
-        {user.role === Role.Teacher && (
+        {user.role === Role.Teacher ? (
              <div className="flex gap-2">
-                 <Link to="/admin/quizzes"><Button variant="outline">Gerenciar Listas</Button></Link>
-                 <Link to="/admin/users"><Button>Gerenciar Alunos</Button></Link>
+               <Link to="/admin/quizzes"><Button variant="outline">Gerenciar Listas</Button></Link>
+               <Link to="/admin/users"><Button>Gerenciar Alunos</Button></Link>
              </div>
+        ) : (
+          <div className="flex gap-2">
+            <Link to="/quizzes"><Button>Minhas Listas</Button></Link>
+            <Link to="/schedule"><Button variant="outline">Agendar Aula</Button></Link>
+          </div>
         )}
       </div>
 
@@ -79,21 +84,22 @@ export const Dashboard = ({ user }: { user: User }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Chart Section - Visible mostly to teachers or for general usage stats */}
-        <Card className="lg:col-span-2 p-6 flex flex-col">
-          <h3 className="text-lg font-semibold text-slate-800 mb-4">Atividade Recente</h3>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} />
-                <Tooltip cursor={{fill: '#f1f5f9'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                <Bar dataKey="attempts" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
+        {user.role === Role.Teacher && (
+          <Card className="lg:col-span-2 p-6 flex flex-col">
+            <h3 className="text-lg font-semibold text-slate-800 mb-4">Atividade Recente</h3>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                  <YAxis axisLine={false} tickLine={false} />
+                  <Tooltip cursor={{fill: '#f1f5f9'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+                  <Bar dataKey="attempts" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        )}
 
         {/* Recent Quizzes Side */}
         <Card className="p-6">
@@ -176,6 +182,20 @@ export const Dashboard = ({ user }: { user: User }) => {
           </Card>
         </div>
       )}
+
+      <div className="mt-6">
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-2">Contato</h3>
+          <p className="text-sm">Prof Diogo Spera</p>
+          <p className="text-sm">Celular: <a href="https://wa.me/5566992299439" target="_blank" rel="noreferrer" className="text-indigo-600">(66) 99229-9439</a></p>
+          <p className="text-sm">Endereço: Av: Porto Alegre, 3414 - Centro Norte - Sorriso MT</p>
+          <p className="text-sm"><a href="https://www.google.com/maps?q=Av.+Porto+Alegre,+3414+-+Centro+Norte+-+Sorriso,+MT" target="_blank" rel="noreferrer" className="text-indigo-600">Ver no Google Maps</a></p>
+          <div className="mt-3 flex gap-3">
+            <Link to="/quem-sou-eu" className="text-sm text-slate-700 underline">Quem sou eu</Link>
+            <Link to="/privacidade" className="text-sm text-slate-700 underline">Políticas de Privacidade e Uso</Link>
+          </div>
+        </Card>
+      </div>
     </div>
   );
 };

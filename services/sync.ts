@@ -31,6 +31,10 @@ export const CloudSync = {
     hasUrl: !!url,
     hasKey: !!key,
   },
+  authStatus: {
+    loggedIn: false,
+    email: '' as string | undefined,
+  },
 
   async list<K extends keyof TableMap>(table: K): Promise<TableMap[K][]> {
     if (!client) return [] as TableMap[K][];
@@ -75,5 +79,29 @@ export const CloudSync = {
       result[t] = await CloudSync.count(t);
     }
     return result;
+  },
+  async login(email: string, password: string) {
+    if (!client) return { ok: false, error: 'Cliente não inicializado' };
+    try {
+      const { data, error } = await client.auth.signInWithPassword({ email, password });
+      if (error) { CloudSync.lastError = error.message; return { ok: false, error: error.message }; }
+      CloudSync.authStatus.loggedIn = !!data.session;
+      CloudSync.authStatus.email = email;
+      return { ok: true };
+    } catch (e: any) {
+      CloudSync.lastError = e?.message || String(e);
+      return { ok: false, error: CloudSync.lastError };
+    }
+  },
+  async logout() {
+    if (!client) return;
+    await client.auth.signOut();
+    CloudSync.authStatus.loggedIn = false;
+    CloudSync.authStatus.email = '';
+  },
+  async authUser() {
+    if (!client) return null;
+    const { data } = await client.auth.getUser();
+    return data.user || null;
   }
 };
