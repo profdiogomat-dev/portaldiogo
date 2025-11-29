@@ -30,7 +30,7 @@ class MockDB {
       this.set('users', users);
     }
     if (CloudSync.enabled) {
-      this.syncDown();
+      this.syncDown().catch(() => {});
     }
   }
 

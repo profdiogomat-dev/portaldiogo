@@ -16,8 +16,12 @@ const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
 let client: SupabaseClient | null = null;
-if (url && key) {
-  client = createClient(url, key);
+try {
+  if (url && key && /^https?:\/\//.test(url)) {
+    client = createClient(url, key);
+  }
+} catch (_) {
+  client = null;
 }
 
 export const CloudSync = {
@@ -40,4 +44,3 @@ export const CloudSync = {
     await client.from(table as string).upsert(rows as any, { onConflict: 'id' });
   }
 };
-
