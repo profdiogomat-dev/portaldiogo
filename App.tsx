@@ -52,6 +52,8 @@ const AdminUsers = () => {
     const [users, setUsers] = React.useState(db.getUsers());
     const [file, setFile] = React.useState<File | null>(null);
     const [syncEnabled, setSyncEnabled] = React.useState(CloudSync.enabled);
+    const [cloudInfo, setCloudInfo] = React.useState('');
+    const [cloudUsers, setCloudUsers] = React.useState<User[]>([]);
     const deleteUser = (id: string) => {
         if(confirm('Remover usuário?')) {
             db.deleteUser(id);
@@ -92,6 +94,17 @@ const AdminUsers = () => {
         alert('Sincronização: dados enviados à nuvem.');
     };
 
+    const testConnection = async () => {
+        const res = await CloudSync.ping();
+        if (!res.ok) {
+            setCloudInfo(`Falha na conexão: ${res.error || CloudSync.lastError || 'erro desconhecido'}`);
+            return;
+        }
+        const data = await CloudSync.list('users');
+        setCloudUsers(data as any);
+        setCloudInfo(`Conexão OK. Users na nuvem: ${data.length}`);
+    };
+
     return (
         <div className="space-y-6">
             <h1 className="text-2xl font-bold">Gerenciar Usuários</h1>
@@ -103,9 +116,28 @@ const AdminUsers = () => {
                   <>
                     <Button onClick={syncDown}>Sync Down</Button>
                     <Button variant="outline" onClick={syncUp}>Sync Up</Button>
+                    <Button variant="outline" onClick={testConnection}>Testar Conexão</Button>
                   </>
                 )}
             </div>
+            {syncEnabled && (
+              <div className="mt-3 text-sm">
+                <div className="p-3 bg-slate-50 border rounded">
+                  <div><strong>Status:</strong> {CloudSync.lastError ? `Erro: ${CloudSync.lastError}` : 'Sem erros registrados'}</div>
+                  {cloudInfo && <div className="mt-2">{cloudInfo}</div>}
+                </div>
+                {cloudUsers.length > 0 && (
+                  <div className="mt-3 p-3 bg-slate-50 border rounded">
+                    <div className="font-medium mb-2">Prévia de usuários da nuvem</div>
+                    <ul className="list-disc ml-5">
+                      {cloudUsers.slice(0,5).map(u => (
+                        <li key={u.id}>{u.username} — {u.name}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="bg-white rounded-lg shadow overflow-hidden">
                 <table className="min-w-full divide-y divide-slate-200">
                     <thead className="bg-slate-50">

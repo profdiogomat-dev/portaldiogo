@@ -26,21 +26,31 @@ try {
 
 export const CloudSync = {
   enabled: !!client,
+  lastError: null as string | null,
 
   async list<K extends keyof TableMap>(table: K): Promise<TableMap[K][]> {
     if (!client) return [] as TableMap[K][];
     const { data, error } = await client.from(table as string).select('*');
-    if (error) return [] as TableMap[K][];
+    if (error) { CloudSync.lastError = error.message; return [] as TableMap[K][]; }
     return (data as TableMap[K][]) || [];
   },
 
   async upsert<K extends keyof TableMap>(table: K, row: TableMap[K]) {
     if (!client) return;
-    await client.from(table as string).upsert(row as any, { onConflict: 'id' });
+    const { error } = await client.from(table as string).upsert(row as any, { onConflict: 'id' });
+    if (error) CloudSync.lastError = error.message;
   },
 
   async bulkUpsert<K extends keyof TableMap>(table: K, rows: TableMap[K][]) {
     if (!client || rows.length === 0) return;
-    await client.from(table as string).upsert(rows as any, { onConflict: 'id' });
+    const { error } = await client.from(table as string).upsert(rows as any, { onConflict: 'id' });
+    if (error) CloudSync.lastError = error.message;
+  },
+
+  async ping(): Promise<{ ok: boolean; usersCount?: number; error?: string }> {
+    if (!client) return { ok: false, error: 'Cliente não inicializado. Verifique variáveis VITE_SUPABASE_URL/KEY.' };
+    const { data, error } = await client.from('users').select('id', { count: 'exact', head: true });
+    if (error) { CloudSync.lastError = error.message; return { ok: false, error: error.message }; }
+    return { ok: true, usersCount: (data as any)?.length || undefined };
   }
 };
