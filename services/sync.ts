@@ -52,8 +52,7 @@ export const CloudSync = {
     const { data, error } = await client.from('users').select('id', { count: 'exact', head: true });
     if (error) { CloudSync.lastError = error.message; return { ok: false, error: error.message }; }
     return { ok: true, usersCount: (data as any)?.length || undefined };
-  }
-  ,
+  },
   async count(table: keyof TableMap): Promise<number> {
     if (!client) return 0;
     const { count, error } = await client.from(table as string).select('*', { count: 'exact', head: true });
