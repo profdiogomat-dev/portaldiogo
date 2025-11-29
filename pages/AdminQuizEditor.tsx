@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { Quiz, Question } from '../types';
 import { Button, Card, Input, Textarea, Select, Modal } from '../components/ui';
-import { ArrowLeft, Plus, Save, Trash2, Upload, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Plus, Save, Trash2, Upload, Image as ImageIcon, FileDown } from 'lucide-react';
+import { parsePdfQuestions } from '../services/pdf';
 
 export const AdminQuizEditor = () => {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +22,8 @@ export const AdminQuizEditor = () => {
   // Import State
   const [isImportOpen, setIsImportOpen] = React.useState(false);
   const [importText, setImportText] = React.useState('');
+  const [pdfPreview, setPdfPreview] = React.useState<any[]>([]);
+  const [pdfFile, setPdfFile] = React.useState<File | null>(null);
 
   const load = () => {
     if (id) {
@@ -117,6 +120,30 @@ export const AdminQuizEditor = () => {
     alert(`Importadas ${count} questões.`);
     setIsImportOpen(false);
     setImportText('');
+    load();
+  };
+
+  const handlePdfPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setPdfFile(file);
+    setPdfPreview([]);
+    if (!file || !id) return;
+    const parsed = await parsePdfQuestions(file);
+    setPdfPreview(parsed);
+  };
+  const importPdfParsed = () => {
+    if (!id || pdfPreview.length === 0) return;
+    let count = 0;
+    pdfPreview.forEach((q: any) => {
+      if (q.text && q.options?.A && q.options?.B) {
+        db.createQuestion({ quizId: id, text: q.text, options: q.options, correctOption: q.correctOption || 'A', explanation: '', imageUrl: q.imageUrl || '' });
+        count++;
+      }
+    });
+    alert(`Importadas ${count} questões do PDF.`);
+    setIsImportOpen(false);
+    setPdfFile(null);
+    setPdfPreview([]);
     load();
   };
 
@@ -274,9 +301,33 @@ export const AdminQuizEditor = () => {
                     onChange={e => setImportText(e.target.value)}
                     placeholder={`PERGUNTA: Quanto é 2+2?\nA) 3\nB) 4\nC) 5\nD) 6\nCORRETA: B\n---`}
                 />
-                <div className="flex justify-end">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-2 border rounded-md hover:bg-slate-50 text-sm text-slate-700">
+                      <FileDown size={16}/> PDF
+                      <input type="file" className="hidden" accept="application/pdf" onChange={handlePdfPick} />
+                    </label>
+                    {pdfFile && <span className="text-xs text-slate-500">{pdfFile.name}</span>}
+                  </div>
+                  <div className="flex gap-2">
                     <Button onClick={handleImport}>Processar</Button>
+                    <Button variant="outline" onClick={importPdfParsed} disabled={!pdfPreview.length}>Importar PDF</Button>
+                  </div>
                 </div>
+                {pdfPreview.length > 0 && (
+                  <div className="border rounded p-3 max-h-64 overflow-auto text-xs">
+                    {pdfPreview.slice(0,10).map((q, i) => (
+                      <div key={i} className="mb-2">
+                        <div className="font-medium">{String(q.text || '').slice(0,200)}</div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {Object.entries(q.options || {}).map(([k,v]) => (
+                            <div key={k}><span className="font-bold mr-1">{k})</span>{String(v || '').slice(0,120)}</div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
             </div>
         </Modal>
     </div>
