@@ -14,6 +14,7 @@ import { CloudSync } from './services/sync';
 import { AdminUserDetails } from './pages/AdminUserDetails';
 import { QuemSouEu } from './pages/QuemSouEu';
 import { Privacidade } from './pages/Privacidade';
+import { Profile } from './pages/Profile';
 
 // Mock list page for students
 const StudentQuizzes: React.FC<{ user: User }> = ({ user }) => {
@@ -279,6 +280,7 @@ function App() {
           <Route path="/quizzes" element={<StudentQuizzes user={user} />} />
           <Route path="/quiz/:id" element={<QuizPlayer />} />
           <Route path="/schedule" element={<Schedule />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/quem-sou-eu" element={<QuemSouEu />} />
           <Route path="/privacidade" element={<Privacidade />} />
           

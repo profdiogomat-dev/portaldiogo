@@ -59,6 +59,41 @@ export const Schedule = () => {
     computeSlots(date);
   };
 
+  const whatsappReminder = () => {
+    if (!date || !selected) return;
+    const msg = encodeURIComponent(`Olá! Confirmando aula em ${date} às ${selected}.`);
+    const phone = '5566992299439';
+    window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+  };
+
+  const exportIcs = () => {
+    if (!date || !selected) return;
+    const start = `${date.replace(/-/g, '')}T${selected.replace(':','')}00Z`;
+    const dt = new Date(`${date}T${selected}:00Z`);
+    const endDt = new Date(dt.getTime() + 50 * 60000);
+    const end = `${endDt.toISOString().slice(0,19).replace(/[-:]/g,'').replace('T','T')}Z`;
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Portal da Turma//Agenda//PT-BR',
+      'BEGIN:VEVENT',
+      `UID:${Math.random().toString(36).slice(2)}`,
+      `DTSTAMP:${new Date().toISOString().slice(0,19).replace(/[-:]/g,'').replace('T','T')}Z`,
+      `DTSTART:${start}`,
+      `DTEND:${end}`,
+      'SUMMARY:Aula - Portal da Turma',
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].join('\r\n');
+    const blob = new Blob([ics], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'aula.ics';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-slate-900">Agendar Aula</h1>
@@ -112,7 +147,11 @@ export const Schedule = () => {
               </Select>
             </div>
             <div className="flex justify-end">
-              <Button onClick={handleSchedule} disabled={!date || !selected}>Agendar</Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={exportIcs} disabled={!date || !selected}>Exportar .ics</Button>
+                <Button variant="outline" onClick={whatsappReminder} disabled={!date || !selected}>WhatsApp</Button>
+                <Button onClick={handleSchedule} disabled={!date || !selected}>Agendar</Button>
+              </div>
             </div>
           </div>
         )}

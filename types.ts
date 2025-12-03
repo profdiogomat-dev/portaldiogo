@@ -25,15 +25,25 @@ export interface Question {
   id: string;
   quizId: string;
   text: string;
+  textHtml?: string;
   options: {
     A: string;
     B: string;
     C: string;
     D: string;
   };
+  optionsHtml?: {
+    A?: string;
+    B?: string;
+    C?: string;
+    D?: string;
+  };
   correctOption: 'A' | 'B' | 'C' | 'D';
   explanation?: string;
   imageUrl?: string;
+  tags?: string[];
+  type?: 'alternativas' | 'discursiva';
+  answerPlaceholder?: string;
 }
 
 export interface Quiz {
@@ -112,3 +122,14 @@ export const SUBJECT_LABELS = {
   [Subject.Math]: 'Matemática',
   [Subject.Chem]: 'Química'
 };
+
+declare module 'pdfjs-dist' {
+  export const getDocument: any;
+  export const GlobalWorkerOptions: any;
+}
+
+declare global {
+  interface Window {
+    MathJax: any;
+  }
+}

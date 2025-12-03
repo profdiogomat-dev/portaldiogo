@@ -1,10 +1,9 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
-import { Quiz, Question } from '../types';
+import { Quiz, Question, Subject } from '../types';
 import { Button, Card, Input, Textarea, Select, Modal } from '../components/ui';
-import { ArrowLeft, Plus, Save, Trash2, Upload, Image as ImageIcon, FileDown } from 'lucide-react';
-import { parsePdfQuestions } from '../services/pdf';
+import { ArrowLeft, Plus, Save, Trash2, Upload, Image as ImageIcon } from 'lucide-react';
 
 export const AdminQuizEditor = () => {
   const { id } = useParams<{ id: string }>();
@@ -16,14 +15,19 @@ export const AdminQuizEditor = () => {
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [formData, setFormData] = React.useState<Partial<Question>>({
     options: { A: '', B: '', C: '', D: '' },
-    correctOption: 'A'
+    optionsHtml: {},
+    correctOption: 'A',
+    tags: [],
+    type: 'alternativas',
+    textHtml: ''
   });
 
   // Import State
   const [isImportOpen, setIsImportOpen] = React.useState(false);
   const [importText, setImportText] = React.useState('');
-  const [pdfPreview, setPdfPreview] = React.useState<any[]>([]);
-  const [pdfFile, setPdfFile] = React.useState<File | null>(null);
+  const [isBaseOpen, setIsBaseOpen] = React.useState(false);
+  const [baseHtml, setBaseHtml] = React.useState('');
+  
 
   const load = () => {
     if (id) {
@@ -37,20 +41,91 @@ export const AdminQuizEditor = () => {
 
   React.useEffect(load, [id]);
 
+  const stripHtml = (html: string) => html ? html.replace(/<[^>]+>/g, '').replace(/\s+/g,' ').trim() : '';
+
+  const RichEditor: React.FC<{ value?: string; onChange: (html: string) => void; placeholder?: string }> = ({ value, onChange, placeholder }) => {
+    const ref = React.useRef<HTMLDivElement>(null);
+    const fileRef = React.useRef<HTMLInputElement>(null);
+    React.useEffect(() => { if (ref.current) ref.current.innerHTML = value || ''; }, [value]);
+    const exec = (cmd: string, arg?: string) => { document.execCommand(cmd, false, arg); onChange(ref.current?.innerHTML || ''); };
+    const insertTable = () => { document.execCommand('insertHTML', false, '<table border="1" style="border-collapse:collapse;width:100%"><tr><td>&nbsp;</td><td>&nbsp;</td></tr><tr><td>&nbsp;</td><td>&nbsp;</td></tr></table>'); onChange(ref.current?.innerHTML || ''); };
+    const triggerImage = () => { fileRef.current?.click(); };
+    const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = () => { document.execCommand('insertImage', false, r.result as string); onChange(ref.current?.innerHTML || ''); };
+      r.readAsDataURL(f);
+      e.target.value = '';
+    };
+    const isEmpty = !stripHtml(value || '');
+    const previewRef = React.useRef<HTMLDivElement>(null);
+    React.useEffect(() => {
+      const el = previewRef.current;
+      if ((window as any).MathJax && (window as any).MathJax.typesetPromise && el) {
+        (window as any).MathJax.typesetPromise([el]).catch(() => {});
+      }
+    }, [value]);
+    return (
+      <div className="relative">
+        <div className="flex gap-2 mb-2">
+          <Button type="button" variant="outline" onClick={() => exec('bold')}>B</Button>
+          <Button type="button" variant="outline" onClick={() => exec('italic')}>I</Button>
+          <Button type="button" variant="outline" onClick={() => exec('underline')}>U</Button>
+          <Button type="button" variant="outline" onClick={() => exec('strikeThrough')}>S</Button>
+          <Button type="button" variant="outline" onClick={() => exec('subscript')}>Sub</Button>
+          <Button type="button" variant="outline" onClick={() => exec('superscript')}>Sup</Button>
+          <Button type="button" variant="outline" onClick={() => exec('justifyLeft')}>⟸</Button>
+          <Button type="button" variant="outline" onClick={() => exec('justifyCenter')}>⇔</Button>
+          <Button type="button" variant="outline" onClick={() => exec('justifyRight')}>⟹</Button>
+          <Button type="button" variant="outline" onClick={() => exec('justifyFull')}>≡</Button>
+          <Button type="button" variant="outline" onClick={insertTable}>Tabela</Button>
+          <Button type="button" variant="outline" onClick={triggerImage}>Imagem</Button>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPick} />
+        </div>
+        {isEmpty && placeholder && (
+          <div className="absolute left-2 top-[52px] text-slate-400 pointer-events-none select-none">{placeholder}</div>
+        )}
+        <div
+          ref={ref}
+          className="min-h-28 border rounded p-2 bg-white"
+          contentEditable
+          onInput={() => onChange(ref.current?.innerHTML || '')}
+        />
+        <div ref={previewRef} className="mt-2 text-sm text-slate-600">
+          <div className="font-medium mb-1">Prévia</div>
+          <div dangerouslySetInnerHTML={{ __html: value || '' }} />
+        </div>
+      </div>
+    );
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if(!id || !formData.text || !formData.options?.A || !formData.options?.B) {
-        alert("Preencha o enunciado e pelo menos as opções A e B.");
-        return;
+    if (!id) return;
+    if (formData.type === 'alternativas') {
+      if (!formData.textHtml || !formData.optionsHtml?.A || !formData.optionsHtml?.B) { alert('Preencha o enunciado e pelo menos as opções A e B.'); return; }
+    } else {
+      if (!formData.textHtml) { alert('Preencha o enunciado.'); return; }
     }
 
     const questionData: any = {
         quizId: id,
-        text: formData.text,
-        options: formData.options,
+        text: stripHtml(formData.textHtml || ''),
+        textHtml: formData.textHtml || '',
+        options: {
+          A: stripHtml(formData.optionsHtml?.A || ''),
+          B: stripHtml(formData.optionsHtml?.B || ''),
+          C: stripHtml(formData.optionsHtml?.C || ''),
+          D: stripHtml(formData.optionsHtml?.D || ''),
+        },
+        optionsHtml: formData.optionsHtml || {},
         correctOption: formData.correctOption,
         explanation: formData.explanation || '',
-        imageUrl: formData.imageUrl || ''
+        imageUrl: formData.imageUrl || '',
+        tags: (formData.tags || []),
+        type: formData.type,
+        answerPlaceholder: formData.answerPlaceholder || ''
     };
 
     if(editingId) {
@@ -67,16 +142,26 @@ export const AdminQuizEditor = () => {
     setEditingId(null);
     setFormData({
         options: { A: '', B: '', C: '', D: '' },
+        optionsHtml: {},
         correctOption: 'A',
         text: '',
+        textHtml: '',
         explanation: '',
-        imageUrl: ''
+        imageUrl: '',
+        tags: [],
+        type: 'alternativas',
+        answerPlaceholder: ''
     });
   };
 
   const handleEdit = (q: Question) => {
     setEditingId(q.id);
-    setFormData(q);
+    setFormData({
+      ...q,
+      textHtml: q.textHtml || q.text,
+      optionsHtml: q.optionsHtml || q.options,
+      type: q.type || 'alternativas'
+    });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -123,29 +208,7 @@ export const AdminQuizEditor = () => {
     load();
   };
 
-  const handlePdfPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    setPdfFile(file);
-    setPdfPreview([]);
-    if (!file || !id) return;
-    const parsed = await parsePdfQuestions(file);
-    setPdfPreview(parsed);
-  };
-  const importPdfParsed = () => {
-    if (!id || pdfPreview.length === 0) return;
-    let count = 0;
-    pdfPreview.forEach((q: any) => {
-      if (q.text && q.options?.A && q.options?.B) {
-        db.createQuestion({ quizId: id, text: q.text, options: q.options, correctOption: q.correctOption || 'A', explanation: '', imageUrl: q.imageUrl || '' });
-        count++;
-      }
-    });
-    alert(`Importadas ${count} questões do PDF.`);
-    setIsImportOpen(false);
-    setPdfFile(null);
-    setPdfPreview([]);
-    load();
-  };
+  
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -186,14 +249,19 @@ export const AdminQuizEditor = () => {
                 {editingId && <Button variant="ghost" onClick={resetForm} className="text-xs">Cancelar Edição</Button>}
             </div>
             <form onSubmit={handleSave} className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Button type="button" onClick={() => setIsBaseOpen(true)}>Adicionar texto base</Button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-600">Formato de resposta:</span>
+                    <div className="flex gap-1">
+                      <Button type="button" variant={formData.type === 'alternativas' ? 'outline' : 'ghost'} onClick={() => setFormData({...formData, type: 'alternativas'})}>Com Alternativas</Button>
+                      <Button type="button" variant={formData.type === 'discursiva' ? 'outline' : 'ghost'} onClick={() => setFormData({...formData, type: 'discursiva'})}>Discursiva</Button>
+                    </div>
+                  </div>
+                </div>
                 <div>
-                    <label className="text-sm font-medium text-slate-700">Enunciado</label>
-                    <Textarea 
-                        required
-                        value={formData.text || ''} 
-                        onChange={e => setFormData({...formData, text: e.target.value})} 
-                        placeholder="Digite a pergunta aqui..."
-                    />
+                  <label className="text-sm font-medium text-slate-700">Enunciado</label>
+                  <RichEditor value={formData.textHtml || ''} onChange={(html) => setFormData({...formData, textHtml: html})} placeholder="Digite o enunciado aqui" />
                 </div>
                 
                 {/* Image Upload Mock */}
@@ -213,43 +281,67 @@ export const AdminQuizEditor = () => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {formData.type === 'alternativas' && (
+                  <div id="alternativas-container" className="space-y-4">
                     {(['A','B','C','D'] as const).map(opt => (
-                        <div key={opt}>
-                            <label className="text-xs font-bold text-slate-500 mb-1 block">Opção {opt}</label>
-                            <Input 
-                                value={formData.options?.[opt] || ''} 
-                                onChange={e => setFormData({
-                                    ...formData, 
-                                    options: { ...formData.options!, [opt]: e.target.value }
-                                })}
-                                required={opt === 'A' || opt === 'B'}
-                            />
+                      <div key={opt} className="alternativa flex items-start gap-3">
+                        <div className="alternativa-label mt-1">
+                          <span className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-600">{opt}</span>
                         </div>
+                        <div className="alternativa-editor flex-1">
+                          <RichEditor value={formData.optionsHtml?.[opt] || ''} placeholder={`Digite a alternativa ${opt} aqui`} onChange={(html) => setFormData({
+                            ...formData,
+                            optionsHtml: { ...(formData.optionsHtml || {}), [opt]: html },
+                            options: { ...(formData.options || { A:'',B:'',C:'',D:'' }), [opt]: stripHtml(html) }
+                          })} />
+                        </div>
+                      </div>
                     ))}
-                </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
+                  {formData.type === 'alternativas' && (
                     <div>
-                        <label className="text-sm font-medium text-slate-700">Correta</label>
-                        <Select 
-                            value={formData.correctOption} 
-                            onChange={e => setFormData({...formData, correctOption: e.target.value as any})}
-                        >
-                            <option value="A">A</option>
-                            <option value="B">B</option>
-                            <option value="C">C</option>
-                            <option value="D">D</option>
-                        </Select>
+                      <label className="text-sm font-medium text-slate-700">Correta</label>
+                      <Select 
+                        value={formData.correctOption} 
+                        onChange={e => setFormData({...formData, correctOption: e.target.value as any})}
+                      >
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="C">C</option>
+                        <option value="D">D</option>
+                      </Select>
                     </div>
-                     <div>
-                        <label className="text-sm font-medium text-slate-700">Explicação (Opcional)</label>
-                        <Input 
-                            value={formData.explanation || ''} 
-                            onChange={e => setFormData({...formData, explanation: e.target.value})} 
-                            placeholder="Aparece após responder..."
-                        />
-                    </div>
+                  )}
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">Explicação (Opcional)</label>
+                    <Input 
+                      value={formData.explanation || ''} 
+                      onChange={e => setFormData({...formData, explanation: e.target.value})} 
+                      placeholder="Aparece após responder..."
+                    />
+                  </div>
+                </div>
+
+                {formData.type === 'discursiva' && (
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">Resposta discursiva (placeholder)</label>
+                    <Input value={formData.answerPlaceholder || ''} onChange={e => setFormData({...formData, answerPlaceholder: e.target.value})} placeholder="Digite aqui" />
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-sm font-medium text-slate-700">Assuntos (tags, separado por vírgula)</label>
+                  <Input 
+                    value={(formData.tags || []).join(', ')}
+                    onChange={e => {
+                      const arr = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                      setFormData({...formData, tags: arr});
+                    }}
+                    placeholder="ex: Frações, Equações, Química Geral"
+                  />
                 </div>
 
                 <div className="pt-2 flex justify-end">
@@ -270,26 +362,36 @@ export const AdminQuizEditor = () => {
                     </div>
                     <div className="flex-1 space-y-2">
                         <div className="flex justify-between items-start">
-                            <p className="font-medium text-slate-900 line-clamp-2">{q.text}</p>
+                            <div className="font-medium text-slate-900 line-clamp-2" dangerouslySetInnerHTML={{ __html: q.textHtml || q.text }} />
                             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => handleEdit(q)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><EditIcon size={16}/></button>
-                                <button onClick={() => handleDelete(q.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 size={16}/></button>
+                              <button onClick={() => handleEdit(q)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><EditIcon size={16}/></button>
+                              <button onClick={() => handleDelete(q.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 size={16}/></button>
                             </div>
                         </div>
                         {q.imageUrl && <img src={q.imageUrl} className="h-16 object-contain border rounded bg-slate-50" alt="Questão" />}
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-slate-600">
-                            {Object.entries(q.options).map(([k, v]) => (
-                                <div key={k} className={k === q.correctOption ? "text-emerald-700 font-medium" : ""}>
-                                    <span className="font-bold text-xs mr-1">{k})</span> {v}
-                                </div>
+                        {q.type !== 'discursiva' && (
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-slate-600">
+                            {(['A','B','C','D'] as const).map(k => (
+                              <div key={k} className={k === q.correctOption ? "text-emerald-700 font-medium" : ""}>
+                                <span className="font-bold text-xs mr-1">{k})</span>
+                                <span dangerouslySetInnerHTML={{ __html: (q.optionsHtml && q.optionsHtml[k]) || q.options[k] }} />
+                              </div>
                             ))}
-                        </div>
+                          </div>
+                        )}
+                        {q.tags && q.tags.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {q.tags.map(t => (
+                              <span key={t} className="text-xs px-2 py-0.5 rounded bg-slate-100 border border-slate-200">{t}</span>
+                            ))}
+                          </div>
+                        )}
                     </div>
                 </Card>
             ))}
         </div>
 
-        {/* Import Modal */}
+        {/* Import Modal (Texto) */}
         <Modal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} title="Importar para esta lista">
             <div className="space-y-4">
                 <p className="text-xs text-slate-500">
@@ -301,34 +403,20 @@ export const AdminQuizEditor = () => {
                     onChange={e => setImportText(e.target.value)}
                     placeholder={`PERGUNTA: Quanto é 2+2?\nA) 3\nB) 4\nC) 5\nD) 6\nCORRETA: B\n---`}
                 />
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-2 border rounded-md hover:bg-slate-50 text-sm text-slate-700">
-                      <FileDown size={16}/> PDF
-                      <input type="file" className="hidden" accept="application/pdf" onChange={handlePdfPick} />
-                    </label>
-                    {pdfFile && <span className="text-xs text-slate-500">{pdfFile.name}</span>}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button onClick={handleImport}>Processar</Button>
-                    <Button variant="outline" onClick={importPdfParsed} disabled={!pdfPreview.length}>Importar PDF</Button>
-                  </div>
+                <div className="flex justify-end">
+                  <Button onClick={handleImport}>Processar</Button>
                 </div>
-                {pdfPreview.length > 0 && (
-                  <div className="border rounded p-3 max-h-64 overflow-auto text-xs">
-                    {pdfPreview.slice(0,10).map((q, i) => (
-                      <div key={i} className="mb-2">
-                        <div className="font-medium">{String(q.text || '').slice(0,200)}</div>
-                        <div className="grid grid-cols-2 gap-2">
-                          {Object.entries(q.options || {}).map(([k,v]) => (
-                            <div key={k}><span className="font-bold mr-1">{k})</span>{String(v || '').slice(0,120)}</div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
             </div>
+        </Modal>
+
+        <Modal isOpen={isBaseOpen} onClose={() => setIsBaseOpen(false)} title="Texto base da questão">
+          <div className="space-y-4">
+            <RichEditor value={baseHtml} onChange={setBaseHtml} />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsBaseOpen(false)}>Fechar</Button>
+              <Button onClick={() => { setFormData({ ...formData, textHtml: (baseHtml || '') + (formData.textHtml || '') }); setIsBaseOpen(false); }}>Aplicar ao enunciado</Button>
+            </div>
+          </div>
         </Modal>
     </div>
   );

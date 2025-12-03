@@ -98,6 +98,7 @@ class MockDB {
     if(idx > -1) {
         list[idx] = { ...list[idx], ...data };
         this.set('quizzes', list);
+        if (CloudSync.enabled) CloudSync.upsert('quizzes', list[idx]);
     }
   }
 

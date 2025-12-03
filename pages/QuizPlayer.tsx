@@ -18,6 +18,7 @@ export const QuizPlayer = () => {
   const [score, setScore] = React.useState(0);
   const [attemptId, setAttemptId] = React.useState<string | null>(null);
   const [startedAt, setStartedAt] = React.useState<number>(0);
+  const cardRef = React.useRef<HTMLDivElement>(null);
   const goToIndex = (i: number) => {
     setStepFeedback({ show: false, isCorrect: false });
     setCurrentIdx(i);
@@ -43,9 +44,17 @@ export const QuizPlayer = () => {
     setStartedAt(Date.now());
   }, [quiz]);
 
+  React.useEffect(() => {
+    const el = cardRef.current;
+    if ((window as any).MathJax && (window as any).MathJax.typesetPromise && el) {
+      (window as any).MathJax.typesetPromise([el]).catch(() => {});
+    }
+  }, [currentIdx, submitted]);
+
   if (!quiz) return <div className="p-8 text-center">Carregando lista...</div>;
 
   const currentQ = questions[currentIdx];
+  const totalAlternatives = questions.filter(q => q.type !== 'discursiva').length;
   const total = questions.length;
   const progress = ((currentIdx + 1) / total) * 100;
 
@@ -59,7 +68,14 @@ export const QuizPlayer = () => {
     }
   };
 
+  const handleDiscursive = (text: string) => {
+    if (submitted) return;
+    setAnswers(prev => ({ ...prev, [currentQ.id]: text }));
+    if (attemptId) db.updateAttempt(attemptId, { answers: { ...answers, [currentQ.id]: text } });
+  };
+
   const checkStep = () => {
+    if (currentQ.type === 'discursiva') return;
     const chosen = answers[currentQ.id];
     if (!chosen) return;
     const isCorrect = chosen === currentQ.correctOption;
@@ -80,7 +96,7 @@ export const QuizPlayer = () => {
   const finishQuiz = () => {
     let s = 0;
     questions.forEach(q => {
-        if (answers[q.id] === q.correctOption) s++;
+        if (q.type !== 'discursiva' && answers[q.id] === q.correctOption) s++;
     });
     setScore(s);
     setSubmitted(true);
@@ -95,14 +111,14 @@ export const QuizPlayer = () => {
             userId: u.id,
             quizId: quiz.id,
             score: s,
-            total: total,
+            total: totalAlternatives,
             durationSec,
             startedAt: new Date(startedAt).toISOString(),
             finishedAt: new Date(finishedAtMs).toISOString(),
             details: questions.map(q => ({
                 questionId: q.id,
                 chosen: answers[q.id] || '',
-                isCorrect: answers[q.id] === q.correctOption
+                isCorrect: q.type !== 'discursiva' ? (answers[q.id] === q.correctOption) : false
             }))
         });
     }
@@ -114,9 +130,9 @@ export const QuizPlayer = () => {
         <Card className="p-8 text-center space-y-4">
           <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto text-3xl">🎉</div>
           <h2 className="text-2xl font-bold text-slate-900">Resultado Final</h2>
-          <p className="text-slate-600">Você acertou <strong className="text-indigo-600 text-xl">{score}</strong> de {total} questões.</p>
+          <p className="text-slate-600">Você acertou <strong className="text-indigo-600 text-xl">{score}</strong> de {totalAlternatives} questões objetivas.</p>
           <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden">
-            <div className="bg-indigo-600 h-full" style={{ width: `${(score/total)*100}%` }}></div>
+            <div className="bg-indigo-600 h-full" style={{ width: `${(score/totalAlternatives)*100}%` }}></div>
           </div>
           <div className="flex justify-center gap-4 pt-4">
             <Button variant="outline" onClick={() => navigate('/quizzes')}>Voltar para Listas</Button>
@@ -135,21 +151,26 @@ export const QuizPlayer = () => {
                         <div className="flex gap-3">
                             <span className="font-bold text-slate-400">#{idx+1}</span>
                             <div className="flex-1">
-                                <p className="font-medium mb-2">{q.text}</p>
-                                <div className="text-sm grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                    {Object.entries(q.options).map(([key, val]) => (
+                                <div className="font-medium mb-2" dangerouslySetInnerHTML={{ __html: q.textHtml || q.text }} />
+                                {q.type !== 'discursiva' && (
+                                  <div className="text-sm grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {(['A','B','C','D'] as const).map((key) => {
+                                      const val = q.optionsHtml?.[key] || q.options[key];
+                                      return (
                                         <div key={key} className={cn(
                                             "px-3 py-2 rounded border",
                                             key === correct ? "bg-emerald-50 border-emerald-200 text-emerald-800" :
                                             (key === chosen && !isCorrect) ? "bg-red-50 border-red-200 text-red-800" : "border-slate-100 text-slate-500"
                                         )}>
-                                            <span className="font-bold mr-2">{key})</span> {val}
+                                            <span className="font-bold mr-2">{key})</span> <span dangerouslySetInnerHTML={{ __html: val }} />
                                         </div>
-                                    ))}
-                                </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                                 {q.explanation && !isCorrect && (
                                     <div className="mt-3 p-3 bg-slate-50 rounded text-sm text-slate-600">
-                                        <strong>Explicação:</strong> {q.explanation}
+                                        <strong>Explicação:</strong> <span dangerouslySetInnerHTML={{ __html: q.explanation }} />
                                     </div>
                                 )}
                             </div>
@@ -198,22 +219,22 @@ export const QuizPlayer = () => {
         </div>
 
         {/* Question Card */}
-        <Card className="p-6 md:p-8 min-h-[400px] flex flex-col">
+        <Card ref={cardRef} className="p-6 md:p-8 min-h-[400px] flex flex-col">
             <div className="flex-1">
                 <div className="flex justify-between items-start mb-4">
                     <span className="text-sm font-bold text-indigo-600 tracking-wider uppercase">Questão {currentIdx + 1}</span>
                     <span className="text-xs text-slate-400">{questions.length - currentIdx - 1} restantes</span>
                 </div>
                 
-                <h3 className="text-lg md:text-xl font-medium text-slate-900 mb-6 leading-relaxed">
-                    {currentQ.text}
-                </h3>
+                <div className="text-lg md:text-xl font-medium text-slate-900 mb-6 leading-relaxed" dangerouslySetInnerHTML={{ __html: currentQ.textHtml || currentQ.text }} />
                 {currentQ.imageUrl && (
                     <img src={currentQ.imageUrl} alt="Questão" className="mb-6 max-h-64 rounded-lg object-contain border" />
                 )}
 
-                <div className="space-y-3">
-                    {Object.entries(currentQ.options).map(([key, val]) => {
+                {currentQ.type !== 'discursiva' ? (
+                  <div className="space-y-3">
+                    {(['A','B','C','D'] as const).map((key) => {
+                        const val = currentQ.optionsHtml?.[key] || currentQ.options[key];
                         const isSelected = answers[currentQ.id] === key;
                         let stateClass = "border-slate-200 hover:border-indigo-300 hover:bg-slate-50";
                         
@@ -243,13 +264,18 @@ export const QuizPlayer = () => {
                                 )}>
                                     {key}
                                 </div>
-                                <span className="text-slate-700">{val}</span>
+                                <span className="text-slate-700" dangerouslySetInnerHTML={{ __html: val }} />
                                 {mode === 'step' && stepFeedback.show && key === currentQ.correctOption && <Check size={16} className="text-emerald-600 ml-auto" />}
                                 {mode === 'step' && stepFeedback.show && isSelected && key !== currentQ.correctOption && <X size={16} className="text-red-600 ml-auto" />}
                             </div>
                         )
                     })}
-                </div>
+                  </div>
+                ) : (
+                  <div>
+                    <textarea className="w-full border rounded p-3" rows={5} placeholder={currentQ.answerPlaceholder || 'Digite sua resposta aqui'} value={answers[currentQ.id] || ''} onChange={e => handleDiscursive(e.target.value)} />
+                  </div>
+                )}
 
                 {/* Feedback Box (Step Mode) */}
                 {mode === 'step' && stepFeedback.show && (
@@ -266,7 +292,7 @@ export const QuizPlayer = () => {
                     Anterior
                 </Button>
 
-                {mode === 'step' && !stepFeedback.show ? (
+                {mode === 'step' && currentQ.type !== 'discursiva' && !stepFeedback.show ? (
                     <Button onClick={checkStep} disabled={!answers[currentQ.id]}>
                         Conferir
                     </Button>

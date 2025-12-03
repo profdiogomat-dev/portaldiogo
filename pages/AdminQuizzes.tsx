@@ -20,6 +20,11 @@ export const AdminQuizzes = () => {
   const [progressOpen, setProgressOpen] = React.useState(false);
   const [progressQuizId, setProgressQuizId] = React.useState<string>('');
 
+  // Edit Quiz State
+  const [isEditOpen, setIsEditOpen] = React.useState(false);
+  const [editId, setEditId] = React.useState<string>('');
+  const [editData, setEditData] = React.useState<{ title: string; grade: string; subject: Subject }>({ title: '', grade: 'OUTROS', subject: Subject.Math });
+
   const load = () => setQuizzes(db.getQuizzes());
   React.useEffect(load, []);
 
@@ -28,6 +33,20 @@ export const AdminQuizzes = () => {
         db.deleteQuiz(id);
         load();
     }
+  };
+
+  const openEdit = (q: Quiz) => {
+    setEditId(q.id);
+    setEditData({ title: q.title, grade: q.grade, subject: q.subject });
+    setIsEditOpen(true);
+  };
+  const submitEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editId || !editData.title || !editData.grade || !editData.subject) return;
+    db.updateQuiz(editId, { title: editData.title, grade: editData.grade, subject: editData.subject });
+    setIsEditOpen(false);
+    setEditId('');
+    load();
   };
 
   const handleCreate = (e: React.FormEvent) => {
@@ -155,6 +174,9 @@ export const AdminQuizzes = () => {
                     <Link to={`/admin/quiz/${q.id}`}>
                         <Button variant="outline" className="h-9 px-3">Editar Questões</Button>
                     </Link>
+                    <Button variant="outline" className="h-9 px-3" onClick={() => openEdit(q)}>
+                        <Edit size={18} className="mr-2"/> Editar Lista
+                    </Button>
                     <Button variant="ghost" className="h-9 px-3" onClick={() => { setProgressQuizId(q.id); setProgressOpen(true); }}>Progresso</Button>
                     <button onClick={() => handleDelete(q.id)} className="text-red-500 hover:bg-red-50 p-2 rounded">
                         <Trash2 size={18} />
@@ -235,6 +257,33 @@ export const AdminQuizzes = () => {
         </div>
       </Modal>
 
+      {/* EDIT MODAL */}
+      <Modal isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} title="Editar Lista">
+        <form onSubmit={submitEdit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Nome</label>
+            <Input value={editData.title} onChange={e => setEditData({ ...editData, title: e.target.value })} required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Disciplina</label>
+            <Select value={editData.subject} onChange={e => setEditData({ ...editData, subject: e.target.value as Subject })}>
+              <option value={Subject.Math}>Matemática</option>
+              <option value={Subject.Chem}>Química</option>
+            </Select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Série</label>
+            <Select value={editData.grade} onChange={e => setEditData({ ...editData, grade: e.target.value })}>
+              {Object.entries(GRADE_OPTIONS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+            </Select>
+          </div>
+          <div className="flex justify-end pt-2 gap-2">
+            <Button variant="outline" type="button" onClick={() => setIsEditOpen(false)}>Cancelar</Button>
+            <Button type="submit">Salvar</Button>
+          </div>
+        </form>
+      </Modal>
+
       <Modal isOpen={progressOpen} onClose={() => setProgressOpen(false)} title="Progresso da Lista">
         <div className="space-y-4">
           {progressQuizId && (
@@ -250,7 +299,21 @@ const ProgressBody = ({ quizId }: { quizId: string }) => {
   const users = db.getUsers();
   const attempts = db.getAttemptsByQuiz(quizId);
   const results = db.getResultsByQuiz(quizId);
+  const questions = db.getQuestions(quizId);
   const findUser = (id: string) => users.find(u => u.id === id)?.name || id;
+  const tagIndex = new Map<string, { total: number; correct: number }>();
+  results.forEach(r => {
+    r.details.forEach(d => {
+      const q = questions.find(q => q.id === d.questionId);
+      const tags = q?.tags || [];
+      tags.forEach(t => {
+        const cur = tagIndex.get(t) || { total: 0, correct: 0 };
+        cur.total += 1;
+        if (d.isCorrect) cur.correct += 1;
+        tagIndex.set(t, cur);
+      });
+    });
+  });
   return (
     <div className="space-y-6">
       <div>
@@ -280,6 +343,18 @@ const ProgressBody = ({ quizId }: { quizId: string }) => {
               <div className="text-sm">{r.score}/{r.total}</div>
             </div>
             <div className="mt-2 text-xs text-slate-500">Duração: {r.durationSec ? r.durationSec + 's' : '-'}</div>
+          </Card>
+        ))}
+      </div>
+      <div>
+        <h3 className="font-semibold mb-2">Resumo por Assunto</h3>
+        {Array.from(tagIndex.entries()).length === 0 && (
+          <div className="text-sm text-slate-500">Ainda sem tags nas questões.</div>
+        )}
+        {Array.from(tagIndex.entries()).map(([tag, stats]) => (
+          <Card key={tag} className="p-3 flex justify-between items-center">
+            <div className="text-sm font-medium">{tag}</div>
+            <div className="text-sm">{stats.correct}/{stats.total}</div>
           </Card>
         ))}
       </div>
